@@ -281,31 +281,46 @@ export async function GET(req: NextRequest) {
   const locale = req.headers.get('x-locale') ?? DEFAULT_LOCALE
 
   // ── Site scope resolution ────────────────────────────────────────────────
-  // filterBase is built from ThemeManager's canonical frontEndDomain, NOT the
-  // request host — so localhost dev still resolves the correct production domain
-  // that was stored as url.base in Content Graph when content was published.
-  const host = req.nextUrl.host
+  // Priority: (1) caller-supplied ?domain= param (server adapters that know
+  // their canonical domain pass it explicitly — avoids the localhost ambiguity
+  // where multiple sites share url.base = 'http://localhost:3000'); (2) host-
+  // based ThemeManager lookup (SiteSearch in the navbar, direct API calls).
+  const domainParam = searchParams.get('domain')?.trim() || null
 
   let allSites   = false
   let filterBase: string | null = null
   let siteKey:    string | null = null
 
-  try {
-    const scopeData  = await getClient().request(SCOPE_QUERY, {})
-    const themeItems: any[] = (scopeData as any)?.OT_ThemeManager?.items ?? []
-    const matched = themeItems.find((i: any) => i.frontEndDomain === host) ?? themeItems[0] ?? null
-    if (matched) {
-      allSites = matched.searchScope === 'allSites'
-      const domain = (matched.frontEndDomain as string | undefined) ?? ''
-      if (domain) {
-        const proto = domain.startsWith('localhost') ? 'http' : 'https'
-        filterBase = `${proto}://${domain}`
-        if (!allSites) siteKey = domain
+  if (domainParam && !domainParam.startsWith('localhost')) {
+    // Explicit non-localhost domain supplied — use it directly.
+    filterBase = `https://${domainParam}`
+    siteKey    = domainParam
+  } else if (!domainParam) {
+    // No domain supplied — fall back to request host → ThemeManager lookup.
+    const host = req.nextUrl.host
+    try {
+      const scopeData  = await getClient().request(SCOPE_QUERY, {})
+      const themeItems: any[] = (scopeData as any)?.OT_ThemeManager?.items ?? []
+      // Exact host match first; no fallback to themeItems[0] — an unmatched
+      // host means we cannot reliably identify the site, so proceed without
+      // domain restriction rather than filtering to the wrong site's content.
+      const matched = themeItems.find((i: any) => i.frontEndDomain === host) ?? null
+      if (matched) {
+        allSites = matched.searchScope === 'allSites'
+        const domain = (matched.frontEndDomain as string | undefined) ?? ''
+        // Skip localhost — it is not unique across sites; multiple teams'
+        // local dev instances share url.base = 'http://localhost:3000'.
+        if (domain && !domain.startsWith('localhost')) {
+          filterBase = `https://${domain}`
+          if (!allSites) siteKey = domain
+        }
       }
+    } catch {
+      // scope unavailable — proceed without domain restriction
     }
-  } catch {
-    // scope unavailable — proceed without domain restriction
   }
+  // When domainParam is a localhost value: filterBase stays null → no domain
+  // filter in local dev, which is the safe default for a non-unique host.
 
   // Domain filter is applied in the GraphQL WHERE clause (not post-filtered)
   // so Content Graph handles site isolation natively.

@@ -35,6 +35,7 @@ type DocResult = {
 export type TopicHubConfig = {
   headerName:            string | null
   headerEffect:          string | null
+  siteDomain:            string | null
   damFolderContainerId:  string | null
   searchRecommendations: TopicHubRecommendation[]
   contentBuckets:        TopicHubBucket[]
@@ -554,7 +555,8 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
         practitioners: 'Practitioner',
       }
       const typeParam = typeMap[ct] ?? 'Page'
-      const data = await fetch(`/api/search?semantic=true&type=${typeParam}&limit=9&q=${qs}`)
+      const domainSuffix = config.siteDomain ? `&domain=${encodeURIComponent(config.siteDomain)}` : ''
+      const data = await fetch(`/api/search?semantic=true&type=${typeParam}&limit=9&q=${qs}${domainSuffix}`)
         .then(r => r.json()).catch(() => [])
       return { ct, results: Array.isArray(data) ? data : [], docs: [] }
     })
@@ -629,13 +631,14 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
           blogs: 'Blog', events: 'Event', experiences: 'Experience',
           locations: 'Location', practitioners: 'Practitioner',
         }
-        return `GET /api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}`
+        const dom = config.siteDomain ? `&domain=${config.siteDomain}` : ''
+        return `GET /api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}${dom}`
       }),
       ``,
       `# Content Graph strategy`,
       `ordering:  _ranking: SEMANTIC  _semanticWeight: 0.8`,
       `fulltext:  fuzzy: true, synonyms: ONE`,
-      `scoping:   OT_ThemeManager.frontEndDomain`,
+      `scoping:   ${config.siteDomain ? `domain=${config.siteDomain}` : 'OT_ThemeManager.frontEndDomain (host fallback)'}`,
     ]
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       setCopied(true)
@@ -724,10 +727,11 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
                               </span>
                             )
                           }
+                          const dom = config.siteDomain ? `&domain=${config.siteDomain}` : ''
                           return (
                             <span key={i}>
                               <span style={{ color: 'oklch(0.91 0.27 132)' }}>{'GET '}</span>
-                              <span style={{ color: 'oklch(0.82 0.01 250)' }}>{`/api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}\n`}</span>
+                              <span style={{ color: 'oklch(0.82 0.01 250)' }}>{`/api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}${dom}\n`}</span>
                             </span>
                           )
                         })}
@@ -738,7 +742,7 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
                         <span style={{ color: 'oklch(0.55 0.01 250)' }}>{'fulltext:  '}</span>
                         <span style={{ color: 'oklch(0.78 0.01 250)' }}>{'fuzzy: true, synonyms: ONE\n'}</span>
                         <span style={{ color: 'oklch(0.55 0.01 250)' }}>{'scoping:   '}</span>
-                        <span style={{ color: 'oklch(0.78 0.01 250)' }}>{'OT_ThemeManager.frontEndDomain'}</span>
+                        <span style={{ color: 'oklch(0.78 0.01 250)' }}>{config.siteDomain ? `domain=${config.siteDomain}` : 'OT_ThemeManager.frontEndDomain (host fallback)'}</span>
                       </>
                     )
                   })()}
