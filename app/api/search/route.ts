@@ -8,6 +8,12 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220)
 }
 
+function fulltextClause(semantic: boolean): string {
+  return semantic
+    ? '_fulltext: { match: $query }'
+    : '_fulltext: { match: $query, fuzzy: true, synonyms: ONE }'
+}
+
 // Lightweight scope query — isolated from the shared theme query so a
 // new/unindexed ThemeManager field can never break theme loading.
 const SCOPE_QUERY = `
