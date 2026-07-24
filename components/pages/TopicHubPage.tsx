@@ -147,7 +147,7 @@ function EventCard({ result }: { result: SearchResult }) {
   return (
     <a
       href={result.url}
-      className="group flex gap-md bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="group flex gap-md h-full bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
       {month && (
         <div className="flex-none w-11 text-center pt-px">
@@ -181,7 +181,7 @@ function PageCard({ result }: { result: SearchResult }) {
   return (
     <a
       href={result.url}
-      className="group flex items-start gap-md bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="group flex items-start gap-md h-full bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
       <FileText size={18} className="flex-none text-brand mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1">
@@ -253,7 +253,7 @@ function PractitionerCard({ result }: { result: SearchResult }) {
 
   if (!hasLink) {
     return (
-      <div className="bg-surface border border-fg/8 rounded-ot-surface p-md">
+      <div className="h-full bg-surface border border-fg/8 rounded-ot-surface p-md">
         {inner}
       </div>
     )
@@ -262,7 +262,7 @@ function PractitionerCard({ result }: { result: SearchResult }) {
   return (
     <a
       href={result.url}
-      className="group block bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="group flex flex-col h-full bg-surface border border-fg/8 rounded-ot-surface p-md card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
       {inner}
     </a>
@@ -274,7 +274,7 @@ function PractitionerCard({ result }: { result: SearchResult }) {
 
 function LocationCard({ result }: { result: SearchResult }) {
   return (
-    <div className="flex items-start gap-md bg-surface border border-fg/8 rounded-ot-surface p-md">
+    <div className="flex items-start gap-md h-full bg-surface border border-fg/8 rounded-ot-surface p-md">
       {/* Map thumbnail or pin icon */}
       <div className="flex-none w-13 h-13 rounded-ot-surface overflow-hidden bg-brand/6 border border-brand/12 shrink-0 flex items-center justify-center">
         {result.imageUrl ? (
