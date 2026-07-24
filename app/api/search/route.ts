@@ -295,8 +295,9 @@ export async function GET(req: NextRequest) {
     // Explicit non-localhost domain supplied — use it directly.
     filterBase = `https://${domainParam}`
     siteKey    = domainParam
-  } else if (!domainParam) {
-    // No domain supplied — fall back to request host → ThemeManager lookup.
+  } else {
+    // No domain supplied, OR domain is localhost (not unique across sites) —
+    // fall back to request host → ThemeManager lookup.
     const host = req.nextUrl.host
     try {
       const scopeData  = await getClient().request(SCOPE_QUERY, {})
@@ -319,8 +320,6 @@ export async function GET(req: NextRequest) {
       // scope unavailable — proceed without domain restriction
     }
   }
-  // When domainParam is a localhost value: filterBase stays null → no domain
-  // filter in local dev, which is the safe default for a non-unique host.
 
   // Domain filter is applied in the GraphQL WHERE clause (not post-filtered)
   // so Content Graph handles site isolation natively.
