@@ -99,30 +99,32 @@ const STYLE_CONFIG: Record<TableStyle, StyleConfig> = {
     tableBorder:         'border border-fg/10 rounded-b-ot-surface overflow-hidden',
   },
   elevated: {
-    groupBg:             'bg-accent',
-    groupText:           'text-fg-on-accent font-bold tracking-label uppercase text-label',
+    groupBg:             'bg-brand/10',
+    groupText:           'text-brand font-bold tracking-label uppercase text-label',
     rowLabelClass:       'text-sm font-semibold text-fg',
     rowDivider:          'border-t border-fg/6',
     rowHover:            'hover:bg-fg/[0.03]',
-    // Transparent — the card overlay provides the brand fill
+    // Cells are transparent — the glass overlay below provides the column background
     featuredBodyCell:    'relative z-10 bg-transparent',
-    featuredCellVariant: 'inverted',
-    // Gradient lightens slightly at top, lands on full brand at bottom to meet the card overlay
-    featuredGradient:    'linear-gradient(to bottom, oklch(from var(--ot-brand) calc(l * 1.06) c h) 0%, var(--ot-brand) 100%)',
-    // Header: ring matches the body overlay ring, faint top bloom for lift
-    featuredShadow:      'shadow-[0_0_0_1.5px_oklch(from_var(--ot-brand)_calc(l*0.85)_c_h/0.5),0_-4px_14px_var(--ot-bloom-brand-faint)]',
-    // No top border — header card connects directly to the body overlay; rounded-b for border radius
+    // Overlay is a tinted glass, not solid brand — body text uses default fg colours
+    featuredCellVariant: 'default',
+    featuredGradient:    'linear-gradient(to bottom, oklch(from var(--ot-brand) calc(l * 1.08) c h) 0%, var(--ot-brand) 100%)',
+    // Clean single-weight ring + faint top bloom; overlay carries the body shadow
+    featuredShadow:      'shadow-[0_0_0_1px_oklch(from_var(--ot-brand)_l_c_h/0.35),0_-6px_20px_var(--ot-bloom-brand-faint)]',
     tableBorder:         'border-x border-b border-fg/10 relative rounded-b-ot-surface',
   },
   bold: {
-    groupBg:             'bg-accent',
-    groupText:           'text-fg-on-accent font-bold tracking-label uppercase text-label',
+    // Group row uses brand-hover for the full-width header — richer than accent and
+    // keeps the column reading as one cohesive brand band from header to footer.
+    groupBg:             'bg-brand-hover',
+    groupText:           'text-fg-on-brand font-bold tracking-label uppercase text-label',
     rowLabelClass:       'text-sm font-bold text-fg',
     rowDivider:          'border-t border-fg/8',
     rowHover:            'hover:bg-fg/3',
     featuredBodyCell:    'bg-brand',
     featuredCellVariant: 'inverted',
-    featuredGradient:    'linear-gradient(150deg, oklch(from var(--ot-brand) calc(l * 1.06) c h) 0%, oklch(from var(--ot-brand) calc(l * 0.70) c h) 100%)',
+    // Steeper angle gradient — more drama, clearly distinct from elevated's flat drop
+    featuredGradient:    'linear-gradient(160deg, oklch(from var(--ot-brand) calc(l * 1.10) c h) 0%, oklch(from var(--ot-brand) calc(l * 0.72) c h) 100%)',
     featuredShadow:      'shadow-[0_16px_64px_var(--ot-bloom-brand),0_0_0_2px_oklch(from_var(--ot-brand)_l_c_h/0.5)]',
     tableBorder:         'border border-fg/12 rounded-b-ot-surface overflow-hidden',
   },
@@ -291,9 +293,10 @@ export default function ComparisonTableBlock({
     }
   }
 
-  const mobileIsFeatured = activeCol === featuredIdx
-  // Elevated and bold both show solid brand + inverted text in mobile featured view
-  const mobileInverted   = (tableStyle === 'elevated' || tableStyle === 'bold') && mobileIsFeatured
+  const mobileIsFeatured         = activeCol === featuredIdx
+  // Bold: solid brand fill + inverted text. Elevated: glass tint + default text.
+  const mobileInverted           = tableStyle === 'bold'     && mobileIsFeatured
+  const mobileElevatedFeatured   = tableStyle === 'elevated' && mobileIsFeatured
 
   return (
     <section className={cn('py-xl px-md lg:px-lg', bgClass)}>
@@ -373,8 +376,8 @@ export default function ComparisonTableBlock({
         role="table"
         aria-label={headline}
       >
-        {/* Column headers — pt-sm reserves headroom for the featured column's -mt-sm lift */}
-        <div role="rowgroup" className="pt-sm">
+        {/* Column headers — pt-8 gives clearance for the badge pill to overflow above the card */}
+        <div role="rowgroup" className="pt-8">
           <div role="row" className="grid" style={gridStyle}>
 
             {/* Row label header spacer */}
@@ -393,22 +396,26 @@ export default function ComparisonTableBlock({
                     'flex flex-col gap-sm px-md pt-md pb-lg items-center text-center',
                     featured && [
                       '-mt-sm rounded-t-ot-surface',
+                      'relative overflow-visible',
                       'text-fg-on-brand',
                       style.featuredShadow,
                     ],
                     !featured && i > 0 && 'border-l border-fg/8',
                   )}
                 >
-                  {/* Badge — or fixed spacer so all column names align horizontally */}
+                  {/* Badge — featured pill is absolutely positioned so it straddles the card
+                      top edge (half above, half below). Non-featured uses a height spacer
+                      to keep column names vertically aligned. */}
                   {col.badgeText ? (
-                    <span className={cn(
-                      'text-[10px] tracking-widest uppercase font-bold px-sm py-0.5 rounded-full',
-                      featured
-                        ? 'bg-fg-on-brand/15 text-fg-on-brand'
-                        : 'bg-accent/20 text-fg-on-accent'
-                    )}>
-                      {col.badgeText}
-                    </span>
+                    featured ? (
+                      <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 whitespace-nowrap text-[10px] tracking-widest uppercase font-bold px-sm py-0.5 rounded-full bg-fg-on-brand text-brand shadow-sm">
+                        {col.badgeText}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] tracking-widest uppercase font-bold px-sm py-0.5 rounded-full bg-accent/20 text-fg-on-accent">
+                        {col.badgeText}
+                      </span>
+                    )
                   ) : (
                     <div className="h-5" aria-hidden="true" />
                   )}
@@ -473,16 +480,19 @@ export default function ComparisonTableBlock({
           {tableStyle === 'elevated' && featuredIdx >= 0 && overlayLeft !== null && (
             <div
               aria-hidden="true"
-              className="absolute top-0 bottom-0 bg-brand rounded-b-ot-surface pointer-events-none z-0"
+              className="absolute top-0 bottom-0 rounded-b-ot-surface pointer-events-none z-0"
               style={{
-                left:  overlayLeft,
-                width: overlayWidth ?? 0,
+                left:       overlayLeft,
+                width:      overlayWidth ?? 0,
+                // Glass tint — 9% brand alpha reads in both dark and light modes
+                background: 'oklch(from var(--ot-brand) l c h / 0.09)',
+                // Brand ring on sides + bottom; top is open (header card provides the visual cap)
+                borderLeft:   '1px solid oklch(from var(--ot-brand) l c h / 0.28)',
+                borderRight:  '1px solid oklch(from var(--ot-brand) l c h / 0.28)',
+                borderBottom: '1px solid oklch(from var(--ot-brand) l c h / 0.28)',
                 boxShadow: [
-                  // Clean card border ring — matches header ring
-                  '0 0 0 1.5px oklch(from var(--ot-brand) calc(l * 0.85) c h / 0.5)',
-                  // Subtle bottom-only lift shadow
-                  '0 8px 28px oklch(from var(--ot-brand) l c h / 0.18)',
-                  '0 2px 6px oklch(from var(--ot-brand) l c h / 0.12)',
+                  '0 8px 28px oklch(from var(--ot-brand) l c h / 0.14)',
+                  '0 2px 6px oklch(from var(--ot-brand)  l c h / 0.08)',
                 ].join(', '),
               }}
             />
@@ -505,7 +515,8 @@ export default function ComparisonTableBlock({
                     <div role="rowheader" className="px-md py-sm bg-accent">
                       <span className={style.groupText}>{row.label}</span>
                     </div>
-                    {/* Per-column: featured cell is transparent (overlay shows through), others accent */}
+                    {/* Per-column: featured cell adds a 10% tint on the overlay so group rows
+                        read slightly darker than data rows through the glass */}
                     {columns.map((col, ci) => {
                       const isFeat = ci === featuredIdx
                       return (
@@ -514,7 +525,7 @@ export default function ComparisonTableBlock({
                           aria-hidden="true"
                           className={cn(
                             'py-sm',
-                            isFeat ? 'relative z-10 bg-transparent' : 'bg-accent',
+                            isFeat ? 'relative z-10 bg-brand/10' : 'bg-brand/10',
                           )}
                         />
                       )
@@ -581,10 +592,12 @@ export default function ComparisonTableBlock({
                         'px-md py-md flex items-center justify-center',
                         colIdx > 0 && !featured && 'border-l border-fg/8',
                         featured && style.featuredBodyCell,
-                        // Cell-level divider for featured column in elevated + bold:
-                        // the row's border-t sits behind the overlay (z-0 paints after normal flow),
-                        // so we apply it on the cell itself (z-10) with an on-brand color.
-                        featured && (tableStyle === 'elevated' || tableStyle === 'bold') && rowIdx > 0 && 'border-t border-fg-on-brand/10',
+                        // Cell-level dividers for the featured column — the row's border-t sits
+                        // behind the overlay (z-0), so we apply it on the cell (z-10).
+                        // Elevated uses a brand-tinted line visible through the glass;
+                        // bold uses a brighter inverted line on the solid brand fill.
+                        featured && tableStyle === 'elevated' && rowIdx > 0 && 'border-t border-brand/20',
+                        featured && tableStyle === 'bold'     && rowIdx > 0 && 'border-t border-fg-on-brand/20',
                         roundedBottom && 'rounded-b-ot-surface',
                       )}
                     >
@@ -646,8 +659,9 @@ export default function ComparisonTableBlock({
                   'flex items-center justify-between px-md py-md gap-md',
                   'border-t border-fg/6',
                   rowIdx === 0 && 'border-t-0',
-                  mobileInverted    ? 'bg-brand' :
-                  mobileIsFeatured  ? 'bg-brand/5' : '',
+                  mobileInverted          ? 'bg-brand' :
+                  mobileElevatedFeatured  ? 'bg-brand/8' :
+                  mobileIsFeatured        ? 'bg-brand/5' : '',
                 )}
               >
                 <div role="rowheader" className="min-w-0 flex-1">
