@@ -22,16 +22,19 @@ export default function OT_VideoBlock({ content, displaySettings = {} }: Props) 
   const hasEditorial = Boolean(content.eyebrow || content.heading || hasBody || content.ctaUrl?.default)
 
   if (!hasEditorial) {
+    // Standalone section: constrain to wide-content max-width (same as ImageBlock).
+    // fillHeight is off so aspect-ratio governs height instead of stretching full-bleed.
     return (
-      <div {...pa(content.__composition)} className="w-full flex-1 min-h-0 flex flex-col" data-stagger={staggerAttr}>
-        <VideoBlock
-          src={content.videoUrl ?? ''}
-          title={content.title ?? ''}
-          caption={content.caption ?? undefined}
-          styleOptions={styleOptions}
-          previewAttrs={{ caption: pa('caption') }}
-          fillHeight={true}
-        />
+      <div {...pa(content.__composition)} className="w-full py-xl px-md lg:px-lg" data-stagger={staggerAttr}>
+        <div className="mx-auto max-w-360">
+          <VideoBlock
+            src={content.videoUrl ?? ''}
+            title={content.title ?? ''}
+            caption={content.caption ?? undefined}
+            styleOptions={styleOptions}
+            previewAttrs={{ caption: pa('caption') }}
+          />
+        </div>
       </div>
     )
   }
