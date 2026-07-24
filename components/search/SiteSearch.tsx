@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Search, X, Maximize2, Minimize2, Code2,
+  Search, X, Maximize2, Minimize2,
   FileText, Newspaper, LayoutGrid, Sparkles, Hash, List, SlidersHorizontal,
-  CalendarDays, MapPin, Video, ExternalLink,
+  CalendarDays, MapPin, Video, ExternalLink, Code2,
 } from 'lucide-react'
 import { useSearch } from './SearchProvider'
 import { useTranslation } from '@/lib/i18n/useTranslation'
@@ -62,16 +62,20 @@ export default function SiteSearch() {
   const [topicFilter, setTopicFilter] = useState<string | null>(null)
   const [focusedIdx,  setFocusedIdx]  = useState(-1)
   const [mounted,     setMounted]     = useState(false)
-  const [semantic,     setSemantic]    = useState(false)
-  const [flashFilter,  setFlashFilter] = useState<TypeFilter | null>(null)
-  const [viewMode,     setViewMode]    = useState<ViewMode>('list')
-  const [showDevPanel, setShowDevPanel] = useState(false)
-  const [queryCopied,  setQueryCopied] = useState(false)
+  const [semantic,        setSemantic]        = useState(false)
+  const [flashFilter,     setFlashFilter]     = useState<TypeFilter | null>(null)
+  const [viewMode,        setViewMode]        = useState<ViewMode>('list')
+  const [suggestions,     setSuggestions]     = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [focusedSugIdx,   setFocusedSugIdx]   = useState(-1)
+  const [showDevPanel,    setShowDevPanel]    = useState(false)
+  const [queryCopied,     setQueryCopied]     = useState(false)
 
-  const inputRef        = useRef<HTMLInputElement>(null)
-  const resultsRef      = useRef<HTMLElement>(null)
-  const debounceRef     = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const lastSearchUrlRef = useRef<string>('')
+  const inputRef           = useRef<HTMLInputElement>(null)
+  const resultsRef         = useRef<HTMLElement>(null)
+  const debounceRef        = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const lastSearchUrlRef   = useRef<string>('')
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -93,6 +97,10 @@ export default function SiteSearch() {
       setHasSearched(false)
       setTypeFilter('all')
       setTopicFilter(null)
+      setSuggestions([])
+      setShowSuggestions(false)
+      setFocusedSugIdx(-1)
+      setShowDevPanel(false)
     }
   }, [isOpen])
 
@@ -122,8 +130,9 @@ export default function SiteSearch() {
     try {
       const params = new URLSearchParams({ q: q.trim(), type })
       if (useSemanticSearch) params.set('semantic', 'true')
-      lastSearchUrlRef.current = `/api/search?${params}`
-      const res  = await fetch(`/api/search?${params}`)
+      const fetchUrl = `/api/search?${params}`
+      lastSearchUrlRef.current = fetchUrl
+      const res  = await fetch(fetchUrl)
       const data: SearchResult[] = await res.json()
       setResults(data)
       setFocusedIdx(-1)
@@ -137,8 +146,38 @@ export default function SiteSearch() {
   const handleQueryChange = (value: string) => {
     setQuery(value)
     setTopicFilter(null)
+    setFocusedSugIdx(-1)
+
+    clearTimeout(suggestDebounceRef.current)
+    if (value.trim().length >= 2) {
+      suggestDebounceRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(value.trim())}`)
+          const data: string[] = await res.json()
+          setSuggestions(data)
+          setShowSuggestions(data.length > 0)
+        } catch {}
+      }, 150)
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => runSearch(value, typeFilter, semantic), 300)
+    debounceRef.current = setTimeout(() => {
+      runSearch(value, typeFilter, semantic)
+    }, 350)
+  }
+
+  const handleSuggestionSelect = (suggestion: string) => {
+    setQuery(suggestion)
+    setSuggestions([])
+    setShowSuggestions(false)
+    setFocusedSugIdx(-1)
+    clearTimeout(debounceRef.current)
+    clearTimeout(suggestDebounceRef.current)
+    runSearch(suggestion, typeFilter, semantic)
+    inputRef.current?.focus()
   }
 
   const handleTypeFilter = (f: TypeFilter) => {
@@ -182,6 +221,35 @@ export default function SiteSearch() {
   }, [router, closeSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showSuggestions && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        const next = Math.min(focusedSugIdx + 1, suggestions.length - 1)
+        setFocusedSugIdx(next)
+        document.querySelectorAll<HTMLElement>('[data-suggestion-item]')[next]?.focus()
+        return
+      }
+      if (e.key === 'ArrowUp' && focusedSugIdx >= 0) {
+        e.preventDefault()
+        if (focusedSugIdx === 0) {
+          setFocusedSugIdx(-1)
+          inputRef.current?.focus()
+        } else {
+          const prev = focusedSugIdx - 1
+          setFocusedSugIdx(prev)
+          document.querySelectorAll<HTMLElement>('[data-suggestion-item]')[prev]?.focus()
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        // Dismiss suggestions only; prevent the document-level Escape from closing search.
+        e.nativeEvent.stopImmediatePropagation()
+        setShowSuggestions(false)
+        setFocusedSugIdx(-1)
+        return
+      }
+    }
+
     const items = resultsRef.current?.querySelectorAll<HTMLElement>('[data-result-item]')
     if (!items?.length) return
     if (e.key === 'ArrowDown') {
@@ -356,6 +424,192 @@ export default function SiteSearch() {
     )
   }
 
+
+  // ─── Suggestion dropdown ───────────────────────────────────────────────────
+
+  function SuggestionList({ compact: isCompact }: { compact: boolean }) {
+    return (
+      <AnimatePresence>
+        {showSuggestions && suggestions.length > 0 && (
+          <motion.div
+            key="suggestions-panel"
+            role="listbox"
+            aria-label="Suggested results"
+            data-suggestions-list
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0,  scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: dur(100) } }}
+            transition={{ duration: dur(180), ease: [0.16, 1, 0.3, 1] }}
+            className={[
+              'absolute top-full left-0 right-0 z-20 overflow-hidden',
+              'bg-canvas border border-fg/12 shadow-[0_12px_40px_oklch(0%_0_0/0.22)]',
+              isCompact ? 'rounded-b-ot-surface mt-px' : 'rounded-ot-surface mt-xs',
+            ].join(' ')}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-3.5 py-2.25 border-b border-fg/8">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={11} className="text-brand/70" aria-hidden />
+                <span className="text-[10px] uppercase tracking-[0.12em] font-bold text-fg-muted/50 select-none">
+                  Suggested results
+                </span>
+              </div>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setShowSuggestions(false); setFocusedSugIdx(-1) }}
+                aria-label="Dismiss suggestions"
+                className="text-fg-muted/30 hover:text-fg-muted transition-colors duration-100 p-0.75 rounded"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            {/* Items */}
+            <ul>
+              {suggestions.map((s, i) => (
+                <li key={s} role="option" aria-selected={focusedSugIdx === i}>
+                  <button
+                    data-suggestion-item
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); handleSuggestionSelect(s) }}
+                    className={[
+                      'w-full text-left flex items-center gap-sm transition-colors duration-100',
+                      'border-b border-fg/5 last:border-0',
+                      isCompact ? 'px-3.5 py-2.5' : 'px-4.5 py-3.25',
+                      focusedSugIdx === i
+                        ? 'bg-brand/10'
+                        : 'hover:bg-brand/6',
+                    ].join(' ')}
+                  >
+                    <Search size={isCompact ? 11 : 13} className="shrink-0 text-fg-muted/30" aria-hidden />
+                    <span className={`font-medium text-fg flex-1 ${isCompact ? 'text-[13px]' : 'text-[15px]'}`}>
+                      {s}
+                    </span>
+                    <span className="text-[10px] text-fg-muted/25 font-mono shrink-0 ml-sm select-none">
+                      ↵
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    )
+  }
+
+  // ─── Developer query flyout ────────────────────────────────────────────────
+
+  function DevQueryPanel() {
+    const url = lastSearchUrlRef.current
+    const snippet = [
+      '# API request',
+      `GET ${url || '/api/search?q=<query>&type=all'}`,
+      '',
+      '# Graph strategy',
+      `ordering:  ${semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}`,
+      `fulltext:  ${semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}`,
+      'pinning:   phrase-based (blogs, events, pages)',
+      'scoping:   OT_ThemeManager.frontEndDomain',
+    ].join('\n')
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(snippet).then(() => {
+        setQueryCopied(true)
+        setTimeout(() => setQueryCopied(false), 1800)
+      })
+    }
+
+    return (
+      <motion.div
+        key="dev-flyout"
+        initial={{ x: '100%' }}
+        animate={{ x: 0, transition: { duration: dur(320), ease: [0.16, 1, 0.3, 1] } }}
+        exit={{ x: '100%', transition: { duration: dur(220), ease: [0.4, 0, 1, 1] } }}
+        className="absolute top-0 right-0 bottom-0 z-30 flex flex-col"
+        style={{
+          width: 'min(480px, calc(100% - 160px))',
+          background: 'oklch(0.085 0.008 240)',
+          borderLeft: '1px solid oklch(1 0 0 / 0.09)',
+          boxShadow: '-20px 0 80px oklch(0 0 0 / 0.50)',
+          fontFamily: 'var(--font-geist-mono, monospace)',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-md py-sm shrink-0"
+          style={{ borderBottom: '1px solid oklch(1 0 0 / 0.08)' }}
+        >
+          <div className="flex items-center gap-xs">
+            <Code2 size={13} style={{ color: 'oklch(0.91 0.27 132)' }} aria-hidden />
+            <span
+              className="text-[11px] uppercase tracking-[0.14em] font-bold select-none"
+              style={{ color: 'oklch(0.72 0.18 132)' }}
+            >
+              Query inspector
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDevPanel(false)}
+            aria-label="Close query inspector"
+            className="opacity-40 hover:opacity-90 transition-opacity duration-150 p-1 rounded"
+            style={{ color: 'oklch(0.72 0.01 250)' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <pre
+            className="px-md py-lg text-[14px] leading-[1.9] whitespace-pre-wrap break-all"
+            style={{ color: 'oklch(0.72 0.01 250)' }}
+          >
+            <span style={{ color: 'oklch(0.40 0.01 250)' }}># API request{'\n'}</span>
+            <span style={{ color: 'oklch(0.91 0.27 132)' }}>GET </span>
+            <span style={{ color: 'oklch(0.82 0.01 250)' }}>{url || '/api/search?q=<query>&type=all'}</span>
+            {'\n\n'}
+            <span style={{ color: 'oklch(0.40 0.01 250)' }}># Graph strategy{'\n'}</span>
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>ordering:  </span>
+            <span style={{ color: semantic ? 'oklch(0.91 0.27 132)' : 'oklch(0.78 0.01 250)' }}>
+              {semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}
+            </span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>fulltext:  </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>
+              {semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}
+            </span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>pinning:   </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>phrase-based (blogs, events, pages)</span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>scoping:   </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>OT_ThemeManager.frontEndDomain</span>
+          </pre>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="shrink-0 px-md py-sm flex items-center justify-end"
+          style={{ borderTop: '1px solid oklch(1 0 0 / 0.08)' }}
+        >
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy query details"
+            className="text-[10px] uppercase tracking-widest font-bold px-md py-1.5 rounded-ot-control transition-all duration-150"
+            style={{
+              color:      queryCopied ? 'oklch(0.91 0.27 132)' : 'oklch(0.55 0.01 250)',
+              background: queryCopied ? 'oklch(0.91 0.27 132 / 0.12)' : 'oklch(1 0 0 / 0.05)',
+              border: '1px solid oklch(1 0 0 / 0.08)',
+            }}
+          >
+            {queryCopied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+      </motion.div>
+    )
+  }
 
   // ─── Loading dots ──────────────────────────────────────────────────────────
 
@@ -622,117 +876,6 @@ export default function SiteSearch() {
 
   // ─── Immersive panel ───────────────────────────────────────────────────────
 
-  // ─── Query inspector flyout ────────────────────────────────────────────────
-
-  function DevQueryPanel() {
-    const url     = lastSearchUrlRef.current
-    const snippet = [
-      '# API request',
-      `GET ${url || '/api/search?q=<query>&type=all'}`,
-      '',
-      '# Graph strategy',
-      `ordering:  ${semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}`,
-      `fulltext:  ${semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}`,
-      'pinning:   phrase-based (blogs, events, pages)',
-      'scoping:   OT_ThemeManager.frontEndDomain',
-    ].join('\n')
-
-    const handleCopy = () => {
-      navigator.clipboard.writeText(snippet).then(() => {
-        setQueryCopied(true)
-        setTimeout(() => setQueryCopied(false), 1800)
-      })
-    }
-
-    return (
-      <motion.div
-        key="dev-flyout"
-        initial={{ x: '100%' }}
-        animate={{ x: 0, transition: { duration: dur(320), ease: [0.16, 1, 0.3, 1] } }}
-        exit={{ x: '100%', transition: { duration: dur(220), ease: [0.4, 0, 1, 1] } }}
-        className="absolute top-0 right-0 bottom-0 z-30 flex flex-col"
-        style={{
-          width:      'min(480px, calc(100% - 160px))',
-          background: 'oklch(0.085 0.008 240)',
-          borderLeft: '1px solid oklch(1 0 0 / 0.09)',
-          boxShadow:  '-20px 0 80px oklch(0 0 0 / 0.50)',
-          fontFamily: 'var(--font-geist-mono, monospace)',
-        }}
-      >
-        <div
-          className="flex items-center justify-between px-md py-sm shrink-0"
-          style={{ borderBottom: '1px solid oklch(1 0 0 / 0.08)' }}
-        >
-          <div className="flex items-center gap-xs">
-            <Code2 size={13} style={{ color: 'oklch(0.91 0.27 132)' }} aria-hidden />
-            <span
-              className="text-[11px] uppercase tracking-[0.14em] font-bold select-none"
-              style={{ color: 'oklch(0.72 0.18 132)' }}
-            >
-              Query inspector
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowDevPanel(false)}
-            aria-label="Close query inspector"
-            className="opacity-40 hover:opacity-90 transition-opacity duration-150 p-1 rounded"
-            style={{ color: 'oklch(0.72 0.01 250)' }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <pre
-            className="px-md py-lg text-[14px] leading-[1.9] whitespace-pre-wrap break-all"
-            style={{ color: 'oklch(0.72 0.01 250)' }}
-          >
-            <span style={{ color: 'oklch(0.40 0.01 250)' }}># API request{'\n'}</span>
-            <span style={{ color: 'oklch(0.91 0.27 132)' }}>GET </span>
-            <span style={{ color: 'oklch(0.82 0.01 250)' }}>{url || '/api/search?q=<query>&type=all'}</span>
-            {'\n\n'}
-            <span style={{ color: 'oklch(0.40 0.01 250)' }}># Graph strategy{'\n'}</span>
-            <span style={{ color: 'oklch(0.55 0.01 250)' }}>ordering:  </span>
-            <span style={{ color: semantic ? 'oklch(0.91 0.27 132)' : 'oklch(0.78 0.01 250)' }}>
-              {semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}
-            </span>
-            {'\n'}
-            <span style={{ color: 'oklch(0.55 0.01 250)' }}>fulltext:  </span>
-            <span style={{ color: 'oklch(0.78 0.01 250)' }}>
-              {semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}
-            </span>
-            {'\n'}
-            <span style={{ color: 'oklch(0.55 0.01 250)' }}>pinning:   </span>
-            <span style={{ color: 'oklch(0.78 0.01 250)' }}>phrase-based (blogs, events, pages)</span>
-            {'\n'}
-            <span style={{ color: 'oklch(0.55 0.01 250)' }}>scoping:   </span>
-            <span style={{ color: 'oklch(0.78 0.01 250)' }}>OT_ThemeManager.frontEndDomain</span>
-          </pre>
-        </div>
-
-        <div
-          className="shrink-0 px-md py-sm flex items-center justify-end"
-          style={{ borderTop: '1px solid oklch(1 0 0 / 0.08)' }}
-        >
-          <button
-            type="button"
-            onClick={handleCopy}
-            aria-label="Copy query details"
-            className="text-[10px] uppercase tracking-widest font-bold px-md py-1.5 rounded-ot-control transition-all duration-150"
-            style={{
-              color:      queryCopied ? 'oklch(0.91 0.27 132)' : 'oklch(0.55 0.01 250)',
-              background: queryCopied ? 'oklch(0.91 0.27 132 / 0.12)' : 'oklch(1 0 0 / 0.05)',
-              border:     '1px solid oklch(1 0 0 / 0.08)',
-            }}
-          >
-            {queryCopied ? '✓ Copied' : 'Copy'}
-          </button>
-        </div>
-      </motion.div>
-    )
-  }
-
   function ImmersivePanel() {
     const resultCount = filteredResults.length
     const countLabel  = resultCount !== 1
@@ -741,7 +884,7 @@ export default function SiteSearch() {
 
     return (
       <div
-        className="flex flex-col h-full overflow-hidden"
+        className="relative flex flex-col h-full overflow-hidden"
         style={{
           background: [
             'radial-gradient(ellipse 145% 58% at 50% -4%, oklch(from var(--ot-brand) l c h / 0.38) 0%, transparent 66%)',
@@ -752,24 +895,23 @@ export default function SiteSearch() {
 
         {/* Top bar — controls only, no search wordmark */}
         <div className="flex items-center justify-end px-md lg:px-2xl py-2.5 shrink-0 gap-sm">
-          {hasSearched && (
-            <button
-              type="button"
-              onClick={() => setShowDevPanel(v => !v)}
-              aria-label={showDevPanel ? 'Hide query inspector' : 'Show query inspector'}
-              aria-pressed={showDevPanel}
-              className={[
-                'flex items-center gap-1.25 px-sm h-9 rounded-ot-control transition-all duration-200',
-                'focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2',
-                showDevPanel
-                  ? 'text-brand bg-brand/12 ring-1 ring-brand/30'
-                  : 'text-fg-muted/55 bg-fg/5 ring-1 ring-fg/12 hover:text-fg hover:ring-fg/25 hover:bg-fg/8',
-              ].join(' ')}
-            >
-              <Code2 size={15} />
-              <span className="text-[10px] uppercase tracking-[0.08em] font-semibold hidden sm:inline">Query</span>
-            </button>
-          )}
+          {/* Query inspector toggle — desktop/demo only */}
+          <button
+            type="button"
+            onClick={() => setShowDevPanel(v => !v)}
+            aria-label={showDevPanel ? 'Hide query inspector' : 'Show query inspector'}
+            aria-pressed={showDevPanel}
+            className={[
+              'hidden md:flex items-center gap-1.25 px-sm h-9 rounded-ot-control transition-all duration-200',
+              'focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2',
+              showDevPanel
+                ? 'bg-brand/15 text-brand ring-1 ring-brand/30'
+                : 'text-fg-muted/50 bg-fg/7 ring-1 ring-fg/10 hover:text-fg hover:ring-fg/25 hover:bg-fg/10',
+            ].join(' ')}
+          >
+            <Code2 size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Query</span>
+          </button>
           <button
             type="button"
             onClick={toggleMode}
@@ -825,12 +967,14 @@ export default function SiteSearch() {
                 value={query}
                 onChange={e => handleQueryChange(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onBlur={() => setTimeout(() => { if (!document.activeElement?.closest('[data-suggestions-list]')) { setShowSuggestions(false); setFocusedSugIdx(-1) } }, 200)}
                 placeholder={t('search.placeholder')}
                 autoComplete="off"
                 spellCheck={false}
                 aria-label={t('search.inputLabel')}
                 aria-controls="search-results"
                 aria-autocomplete="list"
+                aria-expanded={showSuggestions}
                 className={[
                   'flex-1 bg-transparent text-fg py-sm outline-none',
                   'text-[1.1rem] font-medium placeholder:text-fg-muted/30',
@@ -847,6 +991,7 @@ export default function SiteSearch() {
                   <X size={13} />
                 </button>
               )}
+              {SuggestionList({ compact: false })}
             </div>
 
             {/* Filter section */}
@@ -998,37 +1143,42 @@ export default function SiteSearch() {
         {/* Input area — visually boxed so it reads as a text field, not a label row */}
         <div className="px-md pt-[8px] pb-[10px] border-b border-fg/8 shrink-0">
           <label htmlFor="search-input-compact" className="sr-only">{t('search.inputLabel')}</label>
-          <div className="flex items-center gap-[8px] rounded-ot-control border border-fg/18 bg-fg/5 focus-within:border-brand/55 focus-within:bg-brand/5 px-2.5 py-2.25 transition-colors duration-150">
-            <Search size={14} className="shrink-0 text-fg-muted/45" aria-hidden />
-            <input
-              ref={inputRef}
-              id="search-input-compact"
-              type="search"
-              value={query}
-              onChange={e => handleQueryChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('search.placeholderCompact')}
-              autoComplete="off"
-              spellCheck={false}
-              aria-label={t('search.inputLabel')}
-              aria-controls="search-results-compact"
-              aria-autocomplete="list"
-              className={[
-                'flex-1 bg-transparent text-fg placeholder:text-fg-muted/35',
-                'text-[14px] font-medium outline-none leading-none',
-                '[&::-webkit-search-cancel-button]:hidden',
-              ].join(' ')}
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => handleQueryChange('')}
-                aria-label={t('search.clearFilter')}
-                className="shrink-0 p-[3px] text-fg-muted/40 hover:text-fg transition-colors"
-              >
-                <X size={12} />
-              </button>
-            )}
+          <div className="relative">
+            <div className="flex items-center gap-[8px] rounded-ot-control border border-fg/18 bg-fg/5 focus-within:border-brand/55 focus-within:bg-brand/5 px-2.5 py-2.25 transition-colors duration-150">
+              <Search size={14} className="shrink-0 text-fg-muted/45" aria-hidden />
+              <input
+                ref={inputRef}
+                id="search-input-compact"
+                type="search"
+                value={query}
+                onChange={e => handleQueryChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={() => setTimeout(() => { if (!document.activeElement?.closest('[data-suggestions-list]')) { setShowSuggestions(false); setFocusedSugIdx(-1) } }, 200)}
+                placeholder={t('search.placeholderCompact')}
+                autoComplete="off"
+                spellCheck={false}
+                aria-label={t('search.inputLabel')}
+                aria-controls="search-results-compact"
+                aria-autocomplete="list"
+                aria-expanded={showSuggestions}
+                className={[
+                  'flex-1 bg-transparent text-fg placeholder:text-fg-muted/35',
+                  'text-[14px] font-medium outline-none leading-none',
+                  '[&::-webkit-search-cancel-button]:hidden',
+                ].join(' ')}
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => handleQueryChange('')}
+                  aria-label={t('search.clearFilter')}
+                  className="shrink-0 p-[3px] text-fg-muted/40 hover:text-fg transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {SuggestionList({ compact: true })}
           </div>
         </div>
 
