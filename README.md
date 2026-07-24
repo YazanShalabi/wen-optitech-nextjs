@@ -253,6 +253,48 @@ The **Analytics** and **Settings** sections in the sidebar are placeholders and 
 | UI components (shell, nav, clients) | [`components/admin/`](components/admin/) |
 | Auth helpers, Graph queries, content-type list | [`lib/admin/`](lib/admin/) |
 
+## Topic Hub
+
+`OT_TopicHubPage` is a search-driven content hub — a single page that fans out into configurable "buckets" of results (blog posts, events, practitioners, locations, documents, and more), each backed by an Optimizely Graph query. Editors configure it through the Visual Builder; the page renders results client-side as visitors search or filter.
+
+### Required environment variables
+
+The Topic Hub queries documents (PDFs, slide decks, etc.) from the Optimizely Content Marketing Platform (CMP) DAM. That query authenticates with the CMP API, so the same CMP credentials used by the CMP Content Preview feature are required:
+
+```bash
+CMP_CLIENT_ID=      # CMP App client_id (Settings → Apps in CMP)
+CMP_CLIENT_SECRET=  # CMP App client_secret
+```
+
+Without these, the document/asset bucket returns no results. All other bucket types (blogs, events, practitioners, locations) query Optimizely Graph and do not require CMP credentials.
+
+### DAM folder setup
+
+To scope asset search to the content belonging to a specific site, create a dedicated folder in the CMP DAM and place all site-related assets inside it. Then copy the folder's **Content Graph GUID** and paste it into the **DAM Folder ID** field on the `OT_TopicHubPage` content item in the Visual Builder. Without this, the asset bucket searches all accessible assets across your CMP instance.
+
+To find the folder GUID: navigate to the folder in the CMP DAM, open its detail panel, and copy the ID from the URL or the item metadata.
+
+### Scoping practitioners and locations to a site
+
+`OT_PractitionerProfile` and `OT_LocationProfile` content items each have a **Site Key** field. The Topic Hub filters these records by matching the `siteKey` field against the **Front-end Domain** value configured on your ThemeManager content item — this is how one shared CMS instance can host profiles for multiple sites without them bleeding across.
+
+For practitioners and locations to appear in Topic Hub results:
+
+1. Open **ThemeManager** in the Visual Builder and confirm the **Front-end Domain** field is set to the site's hostname (e.g. `your-site.vercel.app`).
+2. On each `OT_PractitionerProfile` or `OT_LocationProfile` item, set **Site Key** to the same value.
+
+If the Site Key on a profile does not match the ThemeManager Front-end Domain, that record is excluded from results — this is the most common reason practitioners or locations appear empty on a working hub.
+
+### Where things live
+
+| Concern | Location |
+|---|---|
+| CMS content type | [`cms/content-types/OT_TopicHubPage.ts`](cms/content-types/OT_TopicHubPage.ts) |
+| Graph data fetcher | [`lib/topicHub.ts`](lib/topicHub.ts) |
+| Page renderer (client component) | [`components/pages/TopicHubPage.tsx`](components/pages/TopicHubPage.tsx) |
+| Search query + result types | [`lib/search.ts`](lib/search.ts) |
+| Site key resolver | [`lib/optimizely.ts`](lib/optimizely.ts) (`getSiteKey`) |
+
 ## Deployment
 
 Deployed on **Vercel**. Set every environment variable from the sections above in the Vercel project (Production scope), then deploy.
