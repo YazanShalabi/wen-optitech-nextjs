@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Search, X, Maximize2, Minimize2,
+  Search, X, Maximize2, Minimize2, Code2,
   FileText, Newspaper, LayoutGrid, Sparkles, Hash, List, SlidersHorizontal,
   CalendarDays, MapPin, Video, ExternalLink,
 } from 'lucide-react'
@@ -62,13 +62,16 @@ export default function SiteSearch() {
   const [topicFilter, setTopicFilter] = useState<string | null>(null)
   const [focusedIdx,  setFocusedIdx]  = useState(-1)
   const [mounted,     setMounted]     = useState(false)
-  const [semantic,    setSemantic]    = useState(false)
-  const [flashFilter, setFlashFilter] = useState<TypeFilter | null>(null)
-  const [viewMode,    setViewMode]    = useState<ViewMode>('list')
+  const [semantic,     setSemantic]    = useState(false)
+  const [flashFilter,  setFlashFilter] = useState<TypeFilter | null>(null)
+  const [viewMode,     setViewMode]    = useState<ViewMode>('list')
+  const [showDevPanel, setShowDevPanel] = useState(false)
+  const [queryCopied,  setQueryCopied] = useState(false)
 
-  const inputRef    = useRef<HTMLInputElement>(null)
-  const resultsRef  = useRef<HTMLElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const inputRef        = useRef<HTMLInputElement>(null)
+  const resultsRef      = useRef<HTMLElement>(null)
+  const debounceRef     = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const lastSearchUrlRef = useRef<string>('')
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -119,6 +122,7 @@ export default function SiteSearch() {
     try {
       const params = new URLSearchParams({ q: q.trim(), type })
       if (useSemanticSearch) params.set('semantic', 'true')
+      lastSearchUrlRef.current = `/api/search?${params}`
       const res  = await fetch(`/api/search?${params}`)
       const data: SearchResult[] = await res.json()
       setResults(data)
@@ -618,6 +622,117 @@ export default function SiteSearch() {
 
   // ─── Immersive panel ───────────────────────────────────────────────────────
 
+  // ─── Query inspector flyout ────────────────────────────────────────────────
+
+  function DevQueryPanel() {
+    const url     = lastSearchUrlRef.current
+    const snippet = [
+      '# API request',
+      `GET ${url || '/api/search?q=<query>&type=all'}`,
+      '',
+      '# Graph strategy',
+      `ordering:  ${semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}`,
+      `fulltext:  ${semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}`,
+      'pinning:   phrase-based (blogs, events, pages)',
+      'scoping:   OT_ThemeManager.frontEndDomain',
+    ].join('\n')
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(snippet).then(() => {
+        setQueryCopied(true)
+        setTimeout(() => setQueryCopied(false), 1800)
+      })
+    }
+
+    return (
+      <motion.div
+        key="dev-flyout"
+        initial={{ x: '100%' }}
+        animate={{ x: 0, transition: { duration: dur(320), ease: [0.16, 1, 0.3, 1] } }}
+        exit={{ x: '100%', transition: { duration: dur(220), ease: [0.4, 0, 1, 1] } }}
+        className="absolute top-0 right-0 bottom-0 z-30 flex flex-col"
+        style={{
+          width:      'min(480px, calc(100% - 160px))',
+          background: 'oklch(0.085 0.008 240)',
+          borderLeft: '1px solid oklch(1 0 0 / 0.09)',
+          boxShadow:  '-20px 0 80px oklch(0 0 0 / 0.50)',
+          fontFamily: 'var(--font-geist-mono, monospace)',
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-md py-sm shrink-0"
+          style={{ borderBottom: '1px solid oklch(1 0 0 / 0.08)' }}
+        >
+          <div className="flex items-center gap-xs">
+            <Code2 size={13} style={{ color: 'oklch(0.91 0.27 132)' }} aria-hidden />
+            <span
+              className="text-[11px] uppercase tracking-[0.14em] font-bold select-none"
+              style={{ color: 'oklch(0.72 0.18 132)' }}
+            >
+              Query inspector
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDevPanel(false)}
+            aria-label="Close query inspector"
+            className="opacity-40 hover:opacity-90 transition-opacity duration-150 p-1 rounded"
+            style={{ color: 'oklch(0.72 0.01 250)' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <pre
+            className="px-md py-lg text-[14px] leading-[1.9] whitespace-pre-wrap break-all"
+            style={{ color: 'oklch(0.72 0.01 250)' }}
+          >
+            <span style={{ color: 'oklch(0.40 0.01 250)' }}># API request{'\n'}</span>
+            <span style={{ color: 'oklch(0.91 0.27 132)' }}>GET </span>
+            <span style={{ color: 'oklch(0.82 0.01 250)' }}>{url || '/api/search?q=<query>&type=all'}</span>
+            {'\n\n'}
+            <span style={{ color: 'oklch(0.40 0.01 250)' }}># Graph strategy{'\n'}</span>
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>ordering:  </span>
+            <span style={{ color: semantic ? 'oklch(0.91 0.27 132)' : 'oklch(0.78 0.01 250)' }}>
+              {semantic ? '_ranking: SEMANTIC  _semanticWeight: 0.8' : '_ranking: RELEVANCE'}
+            </span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>fulltext:  </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>
+              {semantic ? 'match: $query' : 'match: $query, fuzzy: true, synonyms: ONE'}
+            </span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>pinning:   </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>phrase-based (blogs, events, pages)</span>
+            {'\n'}
+            <span style={{ color: 'oklch(0.55 0.01 250)' }}>scoping:   </span>
+            <span style={{ color: 'oklch(0.78 0.01 250)' }}>OT_ThemeManager.frontEndDomain</span>
+          </pre>
+        </div>
+
+        <div
+          className="shrink-0 px-md py-sm flex items-center justify-end"
+          style={{ borderTop: '1px solid oklch(1 0 0 / 0.08)' }}
+        >
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy query details"
+            className="text-[10px] uppercase tracking-widest font-bold px-md py-1.5 rounded-ot-control transition-all duration-150"
+            style={{
+              color:      queryCopied ? 'oklch(0.91 0.27 132)' : 'oklch(0.55 0.01 250)',
+              background: queryCopied ? 'oklch(0.91 0.27 132 / 0.12)' : 'oklch(1 0 0 / 0.05)',
+              border:     '1px solid oklch(1 0 0 / 0.08)',
+            }}
+          >
+            {queryCopied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+      </motion.div>
+    )
+  }
+
   function ImmersivePanel() {
     const resultCount = filteredResults.length
     const countLabel  = resultCount !== 1
@@ -636,7 +751,25 @@ export default function SiteSearch() {
       >
 
         {/* Top bar — controls only, no search wordmark */}
-        <div className="flex items-center justify-end px-md lg:px-2xl py-2.5 shrink-0 gap-xs">
+        <div className="flex items-center justify-end px-md lg:px-2xl py-2.5 shrink-0 gap-sm">
+          {hasSearched && (
+            <button
+              type="button"
+              onClick={() => setShowDevPanel(v => !v)}
+              aria-label={showDevPanel ? 'Hide query inspector' : 'Show query inspector'}
+              aria-pressed={showDevPanel}
+              className={[
+                'flex items-center gap-1.25 px-sm h-9 rounded-ot-control transition-all duration-200',
+                'focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2',
+                showDevPanel
+                  ? 'text-brand bg-brand/12 ring-1 ring-brand/30'
+                  : 'text-fg-muted/55 bg-fg/5 ring-1 ring-fg/12 hover:text-fg hover:ring-fg/25 hover:bg-fg/8',
+              ].join(' ')}
+            >
+              <Code2 size={15} />
+              <span className="text-[10px] uppercase tracking-[0.08em] font-semibold hidden sm:inline">Query</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleMode}
@@ -813,6 +946,11 @@ export default function SiteSearch() {
 
           </div>
         </div>
+
+        {/* Query inspector flyout — slides in from right edge */}
+        <AnimatePresence>
+          {showDevPanel && DevQueryPanel()}
+        </AnimatePresence>
       </div>
     )
   }
