@@ -119,17 +119,19 @@ function buildBlankExperienceQuery(withDomain: boolean): string {
 
 // Practitioner search — OT_PractitionerProfile holds the searchable identity
 // (name, credentials, bio) plus the headshot + bio we want to surface. It is a
-// URL-less shared component, so it is NOT domain-scoped here; site isolation is
-// enforced on the page side (buildPractitionerPagesQuery), and only profiles
-// that map to an in-scope page are emitted. Locale is always applied.
-function buildPractitionerProfileQuery(): string {
+// URL-less shared component; when withSiteKey is true the siteKey queryable field
+// is compared against $siteKey (the site's frontEndDomain) to scope results to
+// the current site. Locale is always applied.
+function buildPractitionerProfileQuery(withSiteKey: boolean): string {
+  const skVar    = withSiteKey ? ', $siteKey: String' : ''
+  const skFilter = withSiteKey ? '\n          siteKey: { eq: $siteKey }' : ''
   return `
-    query SearchPractitioners($query: String!, $limit: Int!, $locale: String!) {
+    query SearchPractitioners($query: String!, $limit: Int!, $locale: String!${skVar}) {
       OT_PractitionerProfile(
         orderBy: { _ranking: RELEVANCE }
         where: {
           _fulltext: { match: $query, fuzzy: true, synonyms: ONE }
-          _metadata: { locale: { eq: $locale } }
+          _metadata: { locale: { eq: $locale } }${skFilter}
         }
         limit: $limit
         tracking: { phrase: $query, source: "/search" }
@@ -234,17 +236,19 @@ const SETTINGS_TYPES = new Set([
   'OT_FooterLink',
 ])
 
-function buildLocationQuery(semantic: boolean): string {
-  const ranking = semantic
+function buildLocationQuery(semantic: boolean, withSiteKey: boolean): string {
+  const ranking  = semantic
     ? 'orderBy: { _ranking: SEMANTIC, _semanticWeight: 0.8 }'
     : 'orderBy: { _ranking: RELEVANCE }'
+  const skVar    = withSiteKey ? ', $siteKey: String' : ''
+  const skFilter = withSiteKey ? '\n          siteKey: { eq: $siteKey }' : ''
   return `
-    query SearchLocations($query: String!, $limit: Int!, $locale: String!) {
+    query SearchLocations($query: String!, $limit: Int!, $locale: String!${skVar}) {
       OT_LocationProfile(
         ${ranking}
         where: {
           ${fulltextClause(semantic)}
-          _metadata: { locale: { eq: $locale } }
+          _metadata: { locale: { eq: $locale } }${skFilter}
         }
         limit: $limit
         tracking: { phrase: $query, source: "/search" }
@@ -284,6 +288,7 @@ export async function GET(req: NextRequest) {
 
   let allSites   = false
   let filterBase: string | null = null
+  let siteKey:    string | null = null
 
   try {
     const scopeData  = await getClient().request(SCOPE_QUERY, {})
@@ -295,6 +300,7 @@ export async function GET(req: NextRequest) {
       if (domain) {
         const proto = domain.startsWith('localhost') ? 'http' : 'https'
         filterBase = `${proto}://${domain}`
+        if (!allSites) siteKey = domain
       }
     }
   } catch {
@@ -388,8 +394,8 @@ export async function GET(req: NextRequest) {
   // fallback would otherwise re-emit it as a bare Page without the headshot.
   if (type === 'all' || type === 'Page' || type === 'Practitioner') {
     try {
-      const profileVars = { query: q, limit, locale }
-      const profileData = await getClient().request(buildPractitionerProfileQuery(), profileVars)
+      const profileVars = { query: q, limit, locale, ...(siteKey ? { siteKey } : {}) }
+      const profileData = await getClient().request(buildPractitionerProfileQuery(siteKey !== null), profileVars)
       const profiles: any[] = (profileData as any)?.OT_PractitionerProfile?.items ?? []
 
       if (profiles.length > 0) {
@@ -508,8 +514,8 @@ export async function GET(req: NextRequest) {
   // since locations are shared across an org rather than owned by one site.
   if (type === 'Location') {
     try {
-      const locVars = { query: q, limit, locale }
-      const locData = await getClient().request(buildLocationQuery(semantic), locVars)
+      const locVars = { query: q, limit, locale, ...(siteKey ? { siteKey } : {}) }
+      const locData = await getClient().request(buildLocationQuery(semantic, siteKey !== null), locVars)
       const items: any[] = (locData as any)?.OT_LocationProfile?.items ?? []
       for (const item of items) {
         const key = item._metadata?.key as string | undefined

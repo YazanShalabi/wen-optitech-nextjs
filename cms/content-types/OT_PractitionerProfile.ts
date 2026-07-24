@@ -147,5 +147,14 @@ export const OT_PractitionerProfile = contentType({
       sortOrder:    140,
       indexingType: 'queryable',
     },
+    siteKey: {
+      type:         'string',
+      maxLength:    120,
+      displayName:  'Site Key',
+      description:  'The domain of the site this practitioner belongs to — e.g. "optitech-nextjs-tim.vercel.app". Must match the Front End Domain set in ThemeManager. Used to scope site search and Topic Hub results to the correct site.',
+      group:        'OT_Content',
+      sortOrder:    150,
+      indexingType: 'queryable',
+    },
   },
 })
