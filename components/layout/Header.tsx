@@ -122,7 +122,7 @@ export default async function Header() {
         {t(locale, 'nav.skipToMain')}
       </a>
 
-      <header className="sticky top-0 z-50 bg-canvas/80 backdrop-blur-md border-b border-fg/5">
+      <header className="sticky top-0 z-50 bg-canvas/80 backdrop-blur-md shadow-[0_1px_0_0_var(--ot-bloom-brand-border),0_8px_32px_0_var(--ot-bloom-brand-faint)]">
         <div className="flex items-center justify-between px-md py-md lg:px-lg">
 
           <a href={localizedHref('/', locale)} aria-label={`${logoAlt} — ${t(locale, 'nav.home')}`} className="flex items-center h-12">

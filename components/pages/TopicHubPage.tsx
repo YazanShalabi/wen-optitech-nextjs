@@ -92,9 +92,9 @@ function BlogCard({ result }: { result: SearchResult }) {
   return (
     <a
       href={result.url}
-      className="group block bg-surface border border-fg/8 rounded-ot-surface overflow-hidden card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="group flex flex-col h-full bg-surface border border-fg/8 rounded-ot-surface overflow-hidden card-hover-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
-      <div className="aspect-video overflow-hidden">
+      <div className="aspect-video overflow-hidden shrink-0">
         {result.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -107,7 +107,7 @@ function BlogCard({ result }: { result: SearchResult }) {
           <div className="w-full h-full bg-linear-to-br from-brand/20 to-canvas" />
         )}
       </div>
-      <div className="px-md pt-md pb-lg">
+      <div className="flex flex-col flex-1 px-md pt-md pb-lg">
         {result.topic && (
           <div className="mb-sm flex items-center gap-xs">
             <span className="block w-1.5 h-1.5 bg-accent flex-none" aria-hidden />
@@ -123,7 +123,7 @@ function BlogCard({ result }: { result: SearchResult }) {
           <p className="mt-xs text-body-sm text-fg-muted line-clamp-2 text-pretty">{result.excerpt}</p>
         )}
         {result.published && (
-          <p className="mt-sm text-label text-fg-muted">{formatShortDate(result.published)}</p>
+          <p className="mt-auto pt-sm text-label text-fg-muted">{formatShortDate(result.published)}</p>
         )}
       </div>
     </a>
