@@ -781,7 +781,9 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
 
               {/* Title with configurable effect */}
               {headerEffect === 'depth3d' ? (
-                <PrimaryTextDepth3D text={headerName} />
+                <h1 className="text-display leading-none tracking-display font-extrabold">
+                  <PrimaryTextDepth3D text={headerName} />
+                </h1>
               ) : headerEffect === 'highlight' ? (
                 <h1 className="text-display leading-none tracking-display font-extrabold">
                   <span className={effectClass}>{headerName}</span>
