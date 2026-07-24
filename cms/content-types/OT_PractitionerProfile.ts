@@ -138,15 +138,6 @@ export const OT_PractitionerProfile = contentType({
     },
 
     // ── Directory ─────────────────────────────────────────────────────────────
-    groupTag: {
-      type:         'string',
-      maxLength:    40,
-      displayName:  'Group Tag',
-      description:  'Associates this practitioner with a vertical or group — e.g. "medical", "legal", "technology". Must match the Group Tag Filter on any listing block that should include this person.',
-      group:        'OT_Content',
-      sortOrder:    140,
-      indexingType: 'queryable',
-    },
     siteKey: {
       type:         'string',
       maxLength:    120,

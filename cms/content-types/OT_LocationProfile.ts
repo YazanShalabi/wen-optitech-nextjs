@@ -72,15 +72,6 @@ export const OT_LocationProfile = contentType({
       group:       'OT_Content',
       sortOrder:   50,
     },
-    groupTag: {
-      type:         'string',
-      maxLength:    40,
-      displayName:  'Group Tag',
-      description:  'Associates this location with a vertical or brand. Must match the Group Tag Filter on any listing block that should include this location. e.g. "optimedical" / "optitech-offices".',
-      group:        'OT_Content',
-      sortOrder:    60,
-      indexingType: 'queryable',
-    },
     siteKey: {
       type:         'string',
       maxLength:    120,

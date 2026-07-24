@@ -442,6 +442,18 @@ export async function getSiteSettings(domain = '', locale = DEFAULT_LOCALE): Pro
 }
 
 /**
+ * Returns the frontEndDomain of the ThemeManager that matches the current
+ * request host. Used as the `siteKey` filter for OT_PractitionerProfile and
+ * OT_LocationProfile records so components without a URL can still be scoped
+ * to a single site on a shared CMS instance.
+ */
+export async function getSiteKey(locale = DEFAULT_LOCALE): Promise<string | null> {
+  const domain   = await getRequestDomain()
+  const settings = await getSiteSettings(domain, locale)
+  return (settings?.frontEndDomain as string | undefined) ?? null
+}
+
+/**
  * Builds an inline <style> block that overrides --ot-* CSS custom properties
  * based on ThemeManager color values. Returns an empty string if no overrides are set.
  */
