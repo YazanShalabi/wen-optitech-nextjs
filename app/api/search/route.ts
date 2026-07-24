@@ -287,14 +287,18 @@ export async function GET(req: NextRequest) {
   // based ThemeManager lookup (SiteSearch in the navbar, direct API calls).
   const domainParam = searchParams.get('domain')?.trim() || null
 
-  let allSites   = false
-  let filterBase: string | null = null
-  let siteKey:    string | null = null
+  let allSites      = false
+  let filterBase:   string | null = null
+  let siteKey:      string | null = null
+  let domainResolved = false  // true when we have a definitive site identity
 
   if (domainParam && !domainParam.startsWith('localhost')) {
-    // Explicit non-localhost domain supplied — use it directly.
-    filterBase = `https://${domainParam}`
-    siteKey    = domainParam
+    // Explicit non-localhost domain supplied by the caller (e.g. Topic Hub
+    // adapter passing getSiteKey()). Use it directly — no ThemeManager lookup
+    // needed.
+    filterBase     = `https://${domainParam}`
+    siteKey        = domainParam
+    domainResolved = true
   } else {
     // No domain supplied, OR domain is localhost (not unique across sites) —
     // fall back to request host → ThemeManager lookup.
@@ -302,24 +306,32 @@ export async function GET(req: NextRequest) {
     try {
       const scopeData  = await getClient().request(SCOPE_QUERY, {})
       const themeItems: any[] = (scopeData as any)?.OT_ThemeManager?.items ?? []
-      // Exact host match first; no fallback to themeItems[0] — an unmatched
-      // host means we cannot reliably identify the site, so proceed without
-      // domain restriction rather than filtering to the wrong site's content.
       const matched = themeItems.find((i: any) => i.frontEndDomain === host) ?? null
       if (matched) {
+        domainResolved = true
         allSites = matched.searchScope === 'allSites'
         const domain = (matched.frontEndDomain as string | undefined) ?? ''
         // Skip localhost — it is not unique across sites; multiple teams'
-        // local dev instances share url.base = 'http://localhost:3000'.
+        // local dev instances share url.base = 'http://localhost:3000'. A
+        // localhost match still counts as resolved so dev searches work.
         if (domain && !domain.startsWith('localhost')) {
           filterBase = `https://${domain}`
           if (!allSites) siteKey = domain
         }
       }
     } catch {
-      // scope unavailable — proceed without domain restriction
+      // scope unavailable — domainResolved stays false
     }
   }
+
+  // Safety valve: if we cannot identify which site this request belongs to,
+  // return nothing. This prevents content from every site on the shared CMS
+  // instance leaking through when the host doesn't match any ThemeManager
+  // (e.g. a CMS preview proxy URL, an unregistered staging environment, or
+  // a misconfigured deployment). Returning [] is always safer than returning
+  // results from the wrong sites. Local dev and explicitly-configured allSites
+  // ThemeManagers both reach this point with domainResolved=true.
+  if (!domainResolved) return NextResponse.json([])
 
   // Domain filter is applied in the GraphQL WHERE clause (not post-filtered)
   // so Content Graph handles site isolation natively.

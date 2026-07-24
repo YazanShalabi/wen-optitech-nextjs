@@ -121,12 +121,11 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json([])
 
   // Folder-scoped search via CMP API (primary path for Topic Hub doc buckets).
-  // When a folderId is given, NEVER fall back to the unscoped Graph query — it
-  // would return assets from every site on the shared instance, which is worse
-  // than returning nothing. If CMP isn't configured or the call fails, return
-  // empty results so the caller gets a clear "no results" signal.
-  if (folderId) {
-    if (!cmpConfigured()) return NextResponse.json([])
+  // If CMP IS configured and the call fails, return empty — don't fall through
+  // to the unscoped Graph query (which returns assets from all sites).
+  // If CMP is NOT configured (no credentials in env), fall through to Graph so
+  // editors still see some results without needing CMP set up.
+  if (folderId && cmpConfigured()) {
     try {
       const results = await searchCmpFolder(q, folderId, limit)
       return NextResponse.json(results)
@@ -136,8 +135,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // No folderId — Graph fulltext across all accessible assets (explicit editor
-  // opt-in: leaving DAM Folder ID blank in the CMS means "search everything").
+  // No folderId, or folderId present but CMP not configured — Graph fulltext
+  // across all accessible assets. Leaving DAM Folder ID blank in the CMS is
+  // the explicit opt-in for this unscoped mode.
   try {
     const results = await searchGraphDocs(q, limit)
     return NextResponse.json(results)

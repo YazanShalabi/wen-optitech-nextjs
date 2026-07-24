@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, startTransition } from 'react'
+import { useState, useEffect, useRef, useCallback, startTransition, useId } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import {
   Search, Sparkles, Loader2, X,
   CalendarDays, Newspaper, FileText, BookOpen, Code2,
-  MapPin, Video, ArrowRight, ArrowDownToLine,
+  MapPin, Video, ArrowRight, ArrowDownToLine, ChevronDown,
   Users, Building2, Globe, Award, Layers,
   GraduationCap, Heart, Scale, BarChart3,
   Lightbulb, Folder, Tag, MessageSquare,
@@ -434,6 +434,9 @@ function SectionHeading({ iconName, label }: { iconName: string | null; label: s
 
 // ─── Bucket result renderer ────────────────────────────────────────────────────
 
+const BUCKET_INITIAL = 6
+const BUCKET_PAGE    = 6
+
 function BucketResults({
   bucket,
   results,
@@ -445,7 +448,13 @@ function BucketResults({
   docs:    DocResult[]
   loading: boolean
 }) {
-  const ct = bucket.sectionContentType
+  const ct           = bucket.sectionContentType
+  const prefersRM    = useReducedMotion()
+  const listId       = useId()
+  const [visibleCount, setVisibleCount] = useState(BUCKET_INITIAL)
+
+  // Reset pagination when a new query delivers a fresh result set.
+  useEffect(() => { setVisibleCount(BUCKET_INITIAL) }, [results, docs])
 
   const skeletonCount = ct === 'blogs' ? 6 : ct === 'events' ? 3 : 3
 
@@ -466,28 +475,73 @@ function BucketResults({
     return <PageSkeleton />
   }
 
-  const isEmpty = ct === 'assets' ? docs.length === 0 : results.length === 0
+  const allItems  = ct === 'assets' ? docs : results
+  const isEmpty   = allItems.length === 0
+  const visible   = allItems.slice(0, visibleCount)
+  const hasMore   = !loading && allItems.length > visibleCount
 
   if (!loading && isEmpty) return null
+
+  function renderCard(item: SearchResult | DocResult, index: number) {
+    const isNew    = index >= BUCKET_INITIAL && index < visibleCount
+    const delay    = isNew ? (index - (visibleCount - BUCKET_PAGE)) * 0.04 : 0
+
+    const cardVariants = {
+      hidden: { opacity: 0, y: prefersRM ? 0 : 10 },
+      show:   {
+        opacity: 1, y: 0,
+        transition: { duration: prefersRM ? 0 : 0.22, delay, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+      },
+    }
+
+    const inner = ct === 'assets'
+      ? <DocRow  doc={item as DocResult} />
+      : ct === 'blogs'         ? <BlogCard         result={item as SearchResult} />
+      : ct === 'events'        ? <EventCard        result={item as SearchResult} />
+      : ct === 'practitioners' ? <PractitionerCard result={item as SearchResult} />
+      : ct === 'locations'     ? <LocationCard     result={item as SearchResult} />
+      :                          <PageCard         result={item as SearchResult} />
+
+    return (
+      <motion.div
+        key={(item as SearchResult).id ?? (item as DocResult).id}
+        layout={false}
+        variants={cardVariants}
+        initial="hidden"
+        animate="show"
+      >
+        {inner}
+      </motion.div>
+    )
+  }
 
   return (
     <section aria-label={bucket.sectionHeadline}>
       <SectionHeading iconName={bucket.sectionIcon} label={bucket.sectionHeadline || 'Results'} />
 
-      <div className={gridClass[ct] ?? 'grid gap-md grid-cols-1 sm:grid-cols-2'}>
+      <div
+        id={listId}
+        className={gridClass[ct] ?? 'grid gap-md grid-cols-1 sm:grid-cols-2'}
+      >
         {loading
           ? Array.from({ length: skeletonCount }).map((_, i) => <SkeletonComp key={i} />)
-          : ct === 'assets'
-            ? docs.map(doc => <DocRow key={doc.id} doc={doc} />)
-            : results.map(r => {
-                if (ct === 'blogs')         return <BlogCard         key={r.id} result={r} />
-                if (ct === 'events')        return <EventCard        key={r.id} result={r} />
-                if (ct === 'practitioners') return <PractitionerCard key={r.id} result={r} />
-                if (ct === 'locations')     return <LocationCard     key={r.id} result={r} />
-                return                             <PageCard         key={r.id} result={r} />
-              })
+          : (visible as Array<SearchResult | DocResult>).map((item, i) => renderCard(item, i))
         }
       </div>
+
+      {hasMore && (
+        <div className="mt-md flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount(c => c + BUCKET_PAGE)}
+            aria-controls={listId}
+            className="inline-flex items-center gap-xs px-lg py-sm text-label font-medium text-fg-muted border border-fg/15 rounded-ot-control bg-surface hover:border-brand hover:text-fg motion-safe:transition-all motion-safe:duration-150 cursor-pointer"
+          >
+            <ChevronDown size={14} aria-hidden />
+            {`View more · ${allItems.length - visibleCount} remaining`}
+          </button>
+        </div>
+      )}
     </section>
   )
 }
@@ -556,7 +610,7 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
       }
       const typeParam = typeMap[ct] ?? 'Page'
       const domainSuffix = config.siteDomain ? `&domain=${encodeURIComponent(config.siteDomain)}` : ''
-      const data = await fetch(`/api/search?semantic=true&type=${typeParam}&limit=9&q=${qs}${domainSuffix}`)
+      const data = await fetch(`/api/search?semantic=true&type=${typeParam}&limit=12&q=${qs}${domainSuffix}`)
         .then(r => r.json()).catch(() => [])
       return { ct, results: Array.isArray(data) ? data : [], docs: [] }
     })
@@ -632,7 +686,7 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
           locations: 'Location', practitioners: 'Practitioner',
         }
         const dom = config.siteDomain ? `&domain=${config.siteDomain}` : ''
-        return `GET /api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}${dom}`
+        return `GET /api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=12&q=${q}${dom}`
       }),
       ``,
       `# Content Graph strategy`,
@@ -731,7 +785,7 @@ export default function TopicHubPage({ config }: { config: TopicHubConfig }) {
                           return (
                             <span key={i}>
                               <span style={{ color: 'oklch(0.91 0.27 132)' }}>{'GET '}</span>
-                              <span style={{ color: 'oklch(0.82 0.01 250)' }}>{`/api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=9&q=${q}${dom}\n`}</span>
+                              <span style={{ color: 'oklch(0.82 0.01 250)' }}>{`/api/search?semantic=true&type=${typeMap[ct] ?? 'Page'}&limit=12&q=${q}${dom}\n`}</span>
                             </span>
                           )
                         })}
