@@ -2449,8 +2449,8 @@ body {
  * frost on light. This satisfies DESIGN.md's "never light-frosted on light
  * backgrounds" rule automatically, in both directions, without a second variant.
  *
- * (This is distinct from .banner-glass, which is a heavier OPAQUE canvas-75%
- * treatment — a different material, intentionally not unified with this one.)
+ * (This is distinct from .banner-glass, which uses a similar low-alpha approach
+ * but with color-specific backdrops; see the banner-glass section below.)
  *
  * background: oklch(from var(--ot-fg) l c h / 0.07) — low-alpha tint lets the
  *   backdrop-filter do the work; a higher-alpha/opaque fill would occlude the blur.
@@ -3229,24 +3229,106 @@ body {
   pointer-events: none;
 }
 
-/* ── Glass panels: dark-tinted frost for scrim=glass treatment ── */
-.banner-glass {
-  border-radius: var(--ot-radius-surface); /* Corner Style axis — 0px default */
-  background: oklch(from var(--ot-canvas) l c h / 0.75);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid oklch(from var(--ot-fg) l c h / 0.10);
-  box-shadow: 0 8px 40px oklch(from var(--ot-canvas) l c h / 0.50);
+/* ── No-image glass backdrops ─────────────────────────────────────────────────
+ *
+ * backdrop-filter is invisible against a flat color. These gradient backdrops
+ * give the blur filter tonal variance to react to — producing genuine frosting.
+ * The COLOR IDENTITY for each glass mode lives here; the panels stay near-neutral
+ * and pick up the backdrop's character through the blur.
+ */
+
+.banner-bg-canvas-glass {
+  background:
+    radial-gradient(ellipse 70% 60% at 20% 72%,
+      oklch(from var(--ot-brand) l calc(c * 0.12) h / 0.22) 0%,
+      transparent 60%),
+    radial-gradient(ellipse 55% 50% at 82% 18%,
+      oklch(from var(--ot-accent) l calc(c * 0.14) h / 0.16) 0%,
+      transparent 55%),
+    linear-gradient(155deg,
+      oklch(94.5% 0.010 220) 0%,
+      oklch(97.5% 0.004 22) 45%,
+      oklch(93.0% 0.013 200) 100%);
 }
 
-/* Brand-tinted glass: used when color=brand + treatment=glass */
+.banner-bg-surface-glass {
+  background:
+    radial-gradient(ellipse 65% 55% at 26% 74%,
+      oklch(from var(--ot-brand) l calc(c * 0.16) h / 0.26) 0%,
+      transparent 58%),
+    radial-gradient(ellipse 52% 46% at 80% 20%,
+      oklch(from var(--ot-accent) l calc(c * 0.20) h / 0.18) 0%,
+      transparent 52%),
+    linear-gradient(155deg,
+      oklch(87.5% 0.016 220) 0%,
+      oklch(90.5% 0.010 22) 45%,
+      oklch(85.5% 0.022 200) 100%);
+}
+
+/* Deep multi-stop brand gradient — ranges from dark brand to lighter brand so
+   the glass panel's blur reads as unmistakably brand-colored frosted glass */
+.banner-bg-brand-glass {
+  background:
+    radial-gradient(ellipse 62% 56% at 28% 40%,
+      oklch(from var(--ot-brand) calc(l * 1.20) c h) 0%,
+      transparent 52%),
+    radial-gradient(ellipse 48% 42% at 82% 72%,
+      oklch(from var(--ot-brand) calc(l * 0.85) calc(c * 1.08) h) 0%,
+      transparent 50%),
+    linear-gradient(145deg,
+      oklch(from var(--ot-brand) calc(l * 0.58) calc(c * 0.92) h) 0%,
+      oklch(from var(--ot-brand) calc(l * 0.88) c h) 38%,
+      oklch(from var(--ot-brand) calc(l * 1.10) c h) 65%,
+      oklch(from var(--ot-brand) calc(l * 0.76) calc(c * 1.06) h) 100%);
+}
+
+/* ── Glass panels ─────────────────────────────────────────────────────────────
+ *
+ * Vs the old 75%-opaque implementation:
+ *   1. Lower panel alpha (40–48%) — more see-through = genuinely glass-like
+ *   2. Higher blur (28–34px) — a thicker frost layer
+ *   3. saturate() boosted — pops backdrop color through the panel
+ *   4. Inset top-edge highlight — "the glass edge catches light" (the Apple tell)
+ *
+ * canvas / surface panels stay near-neutral frosted; color identity comes from
+ * the backdrop gradient, not the panel fill.
+ */
+
+.banner-glass {
+  border-radius: var(--ot-radius-surface);
+  background: oklch(from var(--ot-canvas) l c h / 0.55);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid oklch(from var(--ot-fg) l c h / 0.09);
+  box-shadow:
+    0 8px 40px oklch(from var(--ot-fg) l c h / 0.08),
+    inset 0 1px 0 oklch(from var(--ot-canvas) l c h / 0.75);
+}
+
+/* Surface glass: notably more opaque + stronger shadow than canvas — ensures
+   the two modes are clearly distinguishable even when backdrop colors are similar */
+.banner-glass-surface {
+  border-radius: var(--ot-radius-surface);
+  background: oklch(from var(--ot-surface) l c h / 0.64);
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  border: 1px solid oklch(from var(--ot-fg) l c h / 0.12);
+  box-shadow:
+    0 12px 48px oklch(from var(--ot-surface) l c h / 0.28),
+    inset 0 1px 0 oklch(from var(--ot-surface) l c h / 0.65);
+}
+
+/* Brand glass: light brand-hued tint reads as brand through the blurred backdrop */
 .banner-glass-brand {
-  border-radius: var(--ot-radius-surface); /* Corner Style axis — 0px default */
-  background: oklch(from var(--ot-brand) l c h / 0.15);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid oklch(from var(--ot-brand) l c h / 0.25);
-  box-shadow: 0 8px 40px var(--ot-bloom-brand-faint);
+  border-radius: var(--ot-radius-surface);
+  background: oklch(from var(--ot-brand) calc(l * 1.35) calc(c * 0.16) h / 0.20);
+  backdrop-filter: blur(34px) saturate(210%);
+  -webkit-backdrop-filter: blur(34px) saturate(210%);
+  border: 1px solid oklch(from var(--ot-brand) l c h / 0.30);
+  box-shadow:
+    0 8px 48px var(--ot-bloom-brand-faint),
+    0 24px 72px oklch(from var(--ot-brand) calc(l * 0.55) c h / 0.18),
+    inset 0 1px 0 oklch(from var(--ot-brand) calc(l * 1.50) calc(c * 0.14) h / 0.44);
 }
 
 /* ── Centered banner eyebrow — light-mode accent pill ──────────────────────────
