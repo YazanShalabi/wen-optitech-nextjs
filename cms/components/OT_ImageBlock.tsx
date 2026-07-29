@@ -97,7 +97,7 @@ export default function OT_ImageBlock({ content, displaySettings = {} }: Props) 
       data-stagger={staggerAttr}
     >
       <div className={`grid grid-cols-1 ${gridCols} gap-lg md:gap-xl items-stretch md:min-h-[max(31.25rem,30vw)] mx-auto max-w-360 px-lg py-xl`}>
-        <div className={`min-w-0 flex flex-col ${mediaOrder}`}>
+        <div className={`min-w-0 flex flex-col min-h-125 ${mediaOrder}`}>
           {mediaEl}
         </div>
 
