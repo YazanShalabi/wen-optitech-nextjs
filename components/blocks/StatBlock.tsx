@@ -43,13 +43,18 @@ export type StatItem = {
 }
 
 export type StatBlockStyleOptions = {
-  columns?:   2 | 3 | 4
-  color?:     'brand' | 'canvas' | 'surface'
+  columns?:      2 | 3 | 4
+  color?:        'brand' | 'canvas' | 'surface'
   /** Wraps the stat row in a frosted glass panel layered over the background color */
-  glass?:     boolean
-  showIcons?: boolean
-  animate?:   boolean
+  glass?:        boolean
+  showIcons?:    boolean
+  /** 'inline' (default) — icon left of the label row. 'above' — icon centered above the numeral. */
+  iconPlacement?: 'inline' | 'above'
+  animate?:      boolean
 }
+
+/** Visual treatment applied to each stat numeral — authored as a CMS content property. */
+export type StatEffect = 'none' | 'gradient' | 'glow'
 
 // ─── Value parser ─────────────────────────────────────────────────────────────
 
@@ -213,6 +218,8 @@ export type StatBlockProps = {
   heading?:      string
   stats:         StatItem[]
   styleOptions?: StatBlockStyleOptions
+  /** Numeral visual effect — sourced from the CMS content property, not display settings. */
+  effect?:       StatEffect
 }
 
 export default function StatBlock({
@@ -220,14 +227,18 @@ export default function StatBlock({
   heading,
   stats,
   styleOptions = {},
+  effect = 'none',
 }: StatBlockProps) {
   const {
-    columns   = 3,
-    color     = 'brand',
-    glass     = false,
-    showIcons = false,
-    animate   = true,
+    columns       = 3,
+    color         = 'brand',
+    glass         = false,
+    showIcons     = false,
+    iconPlacement = 'inline',
+    animate       = true,
   } = styleOptions
+
+  const iconAbove = showIcons && iconPlacement === 'above'
 
   const ref    = useRef<HTMLElement>(null)
   const parsed = stats.map(s => parseValue(s.value))
@@ -372,6 +383,8 @@ export default function StatBlock({
           : {}
 
         // ── Hairline rule draws in from the left (scaleX) ─────────────────
+        // When iconAbove the rule is centered (mx-auto); transformOrigin stays
+        // 'left' for the animation — the visual difference is imperceptible.
         const ruleStyle: React.CSSProperties = shouldAnim
           ? {
               transform:       entered ? 'scaleX(1)' : 'scaleX(0)',
@@ -379,8 +392,6 @@ export default function StatBlock({
               transition:      `transform 0.55s var(--ot-ease-kinetic) ${staggerMs + COUNT_LAG + 60}ms`,
             }
           : {}
-
-        // (watermark icon removed — icons now render inline with the label)
 
         const Icon = stat.icon ? ICONS[stat.icon] : null
         const disp = displayFor(p, i)
@@ -390,12 +401,15 @@ export default function StatBlock({
             key={i}
             className={cn(
               'relative overflow-hidden flex flex-col',
+              iconAbove && 'items-center',
               glass
                 // Frosted card: symmetric padding, no dividers — gaps separate them.
                 // Card class is color-specific: bg-glass (dark/brand), banner-glass (canvas/surface light).
                 ? cn(glassCardClass(color), 'p-md md:p-lg')
                 : [
-                    'py-md md:py-lg px-md md:pl-xl md:pr-0',
+                    iconAbove
+                      ? 'py-md md:py-lg px-md'
+                      : 'py-md md:py-lg px-md md:pl-xl md:pr-0',
                     // Mobile horizontal separator — 4-col uses 2×2 grid so suppress
                     // the border on the 2nd item (it shares a row with item 1).
                     columns === 4
@@ -405,12 +419,7 @@ export default function StatBlock({
             )}
             style={itemStyle}
           >
-            {/* ── Vertical column divider — desktop, continuous row only ───
-             * columns=3 renders grid-cols-1 sm:grid-cols-2 lg:grid-cols-3, so
-             * between md (divider turns on) and lg (3rd column appears) the
-             * grid is still 2-up. Item index 2 is a row-start in that 2-up
-             * layout, so its divider must wait for lg — otherwise it draws a
-             * stray rule to the left of an item that isn't sharing a row. */}
+            {/* ── Vertical column divider — desktop, continuous row only ──── */}
             {!glass && i > 0 && (
               <span
                 aria-hidden="true"
@@ -423,11 +432,25 @@ export default function StatBlock({
               />
             )}
 
+            {/* ── Icon above — centered above the numeral when iconPlacement='above' */}
+            {iconAbove && Icon && (
+              <Icon
+                aria-hidden="true"
+                className={cn(iconBadgeCva({ color }), 'mb-sm')}
+                size={38}
+                strokeWidth={1.5}
+                style={labelStyle}
+              />
+            )}
+
             {/* ── Value (count-up) ──────────────────────────────────────── */}
             <p
               className={cn(
                 valueCva({ color, columns }),
+                iconAbove && 'text-center',
                 colPulse[i] && shouldAnim && 'animate-stat-pulse',
+                effect === 'gradient' && 'ot-fx-gradient font-semibold',
+                effect === 'glow'     && 'stat-effect-glow',
               )}
               aria-hidden="true"
             >
@@ -442,17 +465,25 @@ export default function StatBlock({
               aria-hidden="true"
               className={cn(
                 'block h-px w-8 mt-sm shrink-0',
+                iconAbove && 'mx-auto',
                 color === 'brand' ? 'bg-fg-on-brand/20' : 'bg-brand/25',
               )}
               style={ruleStyle}
             />
 
-            {/* ── Label + context — icon left / text right when icon is on ── */}
+            {/* ── Label + context ───────────────────────────────────────────
+             * inline: icon left, text right.
+             * above:  icon already rendered above numeral; text is centered. */}
             <div
-              className={cn('mt-sm flex items-center', showIcons && Icon ? 'gap-sm' : '')}
+              className={cn(
+                'mt-sm flex',
+                iconAbove          ? 'flex-col items-center text-center gap-xs'
+                : showIcons && Icon ? 'items-center gap-sm'
+                : '',
+              )}
               style={labelStyle}
             >
-              {showIcons && Icon && (
+              {!iconAbove && showIcons && Icon && (
                 <Icon
                   aria-hidden="true"
                   className={iconBadgeCva({ color })}
@@ -460,7 +491,7 @@ export default function StatBlock({
                   strokeWidth={1.5}
                 />
               )}
-              <div className="flex flex-col gap-xs">
+              <div className={cn('flex flex-col gap-xs', iconAbove && 'items-center')}>
                 <p className={labelCva({ color })}>{stat.label}</p>
                 {stat.context && (
                   <p className={contextCva({ color })}>{stat.context}</p>

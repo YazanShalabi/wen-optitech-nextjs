@@ -237,6 +237,64 @@ html {
   letter-spacing: -0.01em;
 }
 
+/* ── StatBlock — numeral effects ─────────────────────────────────────────────
+ *
+ * Two opt-in visual treatments for the count-up numeral, applied via the
+ * CMS `effect` content property. Each has dark/light/brand-fill variants so
+ * it works in every color × glass × page-theme combination.
+ *
+ * gradient — delegates to the existing .ot-fx-gradient class (no new CSS).
+ *            font-weight is bumped to semibold in the component so the thicker
+ *            strokes make the colour sweep clearly visible.
+ * glow     — multi-layer text-shadow bloom using brand + accent tokens.
+ *
+ * Cascade contract (mirrors the pattern used by .ot-fx-gradient):
+ *   1. base class — dark-context defaults (plain canvas/surface dark panels).
+ *   2. [data-theme="light"] — light-mode overrides (html carries this attr).
+ *   3. .bg-brand-fill — brand section overrides LAST so they always win.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Glow ────────────────────────────────────────────────────────────────────
+ * Two-layer rendering mirrors .ot-fx-glow:
+ *   text-shadow  — soft per-glyph bloom contained within text metrics.
+ *   filter:drop-shadow — chromatic aurora that spills beyond the glyph edge,
+ *     a tight high-alpha brand core (backlit edge) + wide accent outer bloom.
+ * Together these read as "lit from within" with a genuine two-colour halo. */
+.stat-effect-glow {
+  text-shadow:
+    0 0 0.45em oklch(from var(--ot-brand)  l c h / 0.55),
+    0 0 1.30em oklch(from var(--ot-brand)  l c h / 0.28),
+    0 0 2.80em oklch(from var(--ot-brand)  l c h / 0.14),
+    0 0 0.30em oklch(from var(--ot-accent) l c h / 0.22);
+  filter:
+    drop-shadow(0 0 0.10em oklch(from var(--ot-brand)  l c h / 0.72))
+    drop-shadow(0 0 0.72em oklch(from var(--ot-accent) l c h / 0.38));
+}
+
+/* Light mode: soften both layers so the bloom reads as aura, not mud. */
+[data-theme="light"] .stat-effect-glow {
+  text-shadow:
+    0 0 0.35em oklch(from var(--ot-brand)  l c h / 0.20),
+    0 0 0.90em oklch(from var(--ot-brand)  l c h / 0.10),
+    0 0 0.28em oklch(from var(--ot-accent) l c h / 0.14);
+  filter:
+    drop-shadow(0 0 0.08em oklch(from var(--ot-brand)  l c h / 0.30))
+    drop-shadow(0 0 0.45em oklch(from var(--ot-accent) l c h / 0.20));
+}
+
+/* Brand fill (dark bg): accent-led — accent core + brand outer aurora.
+   Brand-on-brand core would disappear; accent is bright against the dark field. */
+.bg-brand-fill .stat-effect-glow {
+  text-shadow:
+    0 0 0.45em oklch(from var(--ot-accent)       l c h / 0.65),
+    0 0 1.50em oklch(from var(--ot-accent)       l c h / 0.38),
+    0 0 3.00em oklch(from var(--ot-brand)        l c h / 0.20),
+    0 0 0.32em oklch(from var(--ot-fg-on-brand)  l c h / 0.18);
+  filter:
+    drop-shadow(0 0 0.10em oklch(from var(--ot-accent) l c h / 0.75))
+    drop-shadow(0 0 0.80em oklch(from var(--ot-brand)  l c h / 0.32));
+}
+
 /* ── ScrollToTop ─────────────────────────────────────────────────────────────
  *
  * .scroll-top-btn
