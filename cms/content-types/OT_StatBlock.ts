@@ -27,6 +27,7 @@ export const OT_StatBlock = contentType({
     },
     effect: {
       type:        'string',
+      format:      'selectOne',
       displayName: 'Numeral effect',
       description: 'Visual treatment applied to each stat numeral. Works in all colour modes.',
       group:       'OT_Content',
