@@ -74,21 +74,35 @@ function easeOutQuart(t: number): number {
 
 // ─── CVA variants ─────────────────────────────────────────────────────────────
 
-const sectionCva = cva('px-md lg:px-lg', {
+const sectionPaddingCva = cva('px-md lg:px-lg', {
   variants: {
-    color: {
-      brand:   'bg-brand-fill',
-      canvas:  'bg-canvas',
-      surface: 'bg-surface',
-    },
     columns: {
       2: 'py-md lg:py-lg',
       3: 'py-md lg:py-lg',
       4: 'py-sm lg:py-md',
     },
   },
-  defaultVariants: { color: 'brand', columns: 3 },
+  defaultVariants: { columns: 3 },
 })
+
+// Returns the section background class. Brand always uses the rich gradient fill
+// (so backdrop-filter on child .bg-glass cards has tonal variance to blur against).
+// Canvas/surface with glass use the banner gradient backdrops — same reason.
+function sectionBgClass(color: 'brand' | 'canvas' | 'surface', glass: boolean): string {
+  if (color === 'brand') return 'bg-brand-fill'
+  if (glass) return color === 'surface' ? 'banner-bg-surface-glass' : 'banner-bg-canvas-glass'
+  return color === 'surface' ? 'bg-surface' : 'bg-canvas'
+}
+
+// Returns the glass card class for a stat item panel.
+// Brand (dark section): bg-glass uses --ot-fg at 7% → faint white tint on dark → dark frosted glass.
+// Canvas/surface (light section): banner-glass / banner-glass-surface use --ot-canvas / --ot-surface
+// at 55–64% → frosted near-white panels → Apple-style light glassmorphism.
+function glassCardClass(color: 'brand' | 'canvas' | 'surface'): string {
+  if (color === 'surface') return 'banner-glass-surface'
+  if (color === 'canvas')  return 'banner-glass'
+  return 'bg-glass'
+}
 
 const gridCva = cva('grid', {
   variants: {
@@ -310,7 +324,7 @@ export default function StatBlock({
 
   // Extra bottom room so the stats don't sit flush against the section's
   // bottom edge — pairs with the header's mb above the grid for balance.
-  const outerClass = cn(sectionCva({ color, columns }), 'pb-lg lg:pb-xl')
+  const outerClass = cn(sectionPaddingCva({ columns }), sectionBgClass(color, glass), 'pb-lg lg:pb-xl')
 
   // Glass: each stat is its own frosted card separated by a gap (the section
   // color shows through the gaps). Non-glass: a single continuous row with
@@ -378,7 +392,8 @@ export default function StatBlock({
               'relative overflow-hidden flex flex-col',
               glass
                 // Frosted card: symmetric padding, no dividers — gaps separate them.
-                ? 'bg-glass p-md md:p-lg'
+                // Card class is color-specific: bg-glass (dark/brand), banner-glass (canvas/surface light).
+                ? cn(glassCardClass(color), 'p-md md:p-lg')
                 : [
                     'py-md md:py-lg px-md md:pl-xl md:pr-0',
                     // Mobile horizontal separator — 4-col uses 2×2 grid so suppress
@@ -458,9 +473,10 @@ export default function StatBlock({
     </ul>
   )
 
-  // brand fill is always dark; glass overlay is always dark — assert dark theme
-  // so nested tokens (text-fg, text-fg-muted) resolve correctly on any site theme.
-  const isDarkSurface = color === 'brand' || glass
+  // brand fill is always dark — assert dark theme so nested tokens resolve correctly.
+  // Canvas/surface glass stays in its natural (light) theme; the banner-glass* panel
+  // classes are designed for light mode and use canvas/surface-derived tints.
+  const isDarkSurface = color === 'brand'
 
   const header = (eyebrow || heading) ? (
     <header className="flex flex-col gap-xs mb-lg lg:mb-xl max-w-screen-md">
