@@ -8,9 +8,36 @@ import { ICON_REGISTRY, type IconKey } from '@/components/icons/iconRegistry'
 export type NavSubItem = { label: string; href: string; description?: string; icon?: IconKey }
 export type NavItem    = { label: string; href: string; children?: NavSubItem[] }
 
-type Props = { navItems: NavItem[] }
+type Props = {
+  navItems: NavItem[]
+  /**
+   * Typographic voice for the top-level links. 'default' is the unchanged
+   * top-bar treatment (text-sm, sentence case). 'split' is the bolder,
+   * tracked-caps masthead voice used by the split-bar nav style — larger,
+   * heavier, wider gaps, so the header reads as a considered structural
+   * choice rather than a shrunk-down utility bar. Dropdown/mega-menu
+   * behavior and markup are identical in both — only top-level link
+   * typography changes.
+   */
+  variant?: 'default' | 'split'
+  /** Override the landmark label. Needed when a caller renders two DesktopNav
+   * instances side by side (the split-bar masthead splits one item list into
+   * a left and right wing) so screen reader users get two distinct landmarks
+   * instead of two identically-labeled ones. */
+  ariaLabel?: string
+}
 
-export default function DesktopNav({ navItems }: Props) {
+const LINK_VOICE = {
+  default: 'text-sm font-medium text-fg-muted hover:text-fg',
+  split:   'text-label font-semibold uppercase tracking-label text-fg-muted hover:text-fg',
+} as const
+
+const GROUP_GAP = {
+  default: 'gap-lg',
+  split:   'gap-xl',
+} as const
+
+export default function DesktopNav({ navItems, variant = 'default', ariaLabel = 'Primary navigation' }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const navRef = useRef<HTMLElement>(null)
 
@@ -32,8 +59,10 @@ export default function DesktopNav({ navItems }: Props) {
     return () => document.removeEventListener('keydown', handler)
   }, [close])
 
+  const linkVoice = LINK_VOICE[variant]
+
   return (
-    <nav ref={navRef} className="hidden lg:flex items-center gap-lg" aria-label="Primary navigation">
+    <nav ref={navRef} className={`hidden lg:flex items-center ${GROUP_GAP[variant]}`} aria-label={ariaLabel}>
       {navItems.map((item, i) => {
         const hasChildren = !!item.children?.length
         const isOpen      = openIndex === i
@@ -43,7 +72,7 @@ export default function DesktopNav({ navItems }: Props) {
             <Link
               key={item.label}
               href={item.href}
-              className="relative group py-xs text-sm font-medium text-fg-muted hover:text-fg transition-colors duration-150 ease-quick"
+              className={`relative group py-xs transition-colors duration-150 ease-quick ${linkVoice}`}
             >
               {item.label}
               {/* Kinetic underline — scales in from center on hover */}
@@ -67,8 +96,12 @@ export default function DesktopNav({ navItems }: Props) {
               aria-expanded={isOpen}
               aria-haspopup="true"
               onClick={() => setOpenIndex(isOpen ? null : i)}
-              className={`relative group flex items-center gap-xs py-xs text-sm font-medium transition-colors duration-150 ease-quick ${
-                isOpen ? 'text-fg' : 'text-fg-muted hover:text-fg'
+              className={`relative group flex items-center gap-xs py-xs transition-colors duration-150 ease-quick ${linkVoice} ${
+                // Open state gets a clear focus treatment: full-opacity ink plus
+                // bolder weight. A no-op on the split-bar voice (already
+                // font-semibold at rest) but gives the top-bar's font-medium
+                // baseline a real, visible "this is expanded" signal.
+                isOpen ? 'text-fg! font-semibold' : ''
               }`}
             >
               {item.label}

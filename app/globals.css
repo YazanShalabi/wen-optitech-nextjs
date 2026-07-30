@@ -707,6 +707,117 @@ html {
   [data-stagger="draw"][data-in] .ot-divider-bleed { animation: otDividerFade 0.4s ease-in both; } /* dur-exempt: 400ms — nearest base(320) Δ80ms */
 }
 
+/* ── Split-bar masthead entrance ──────────────────────────────────────────
+ * Rides the same MotionObserver as the row stagger above. Two stagger hosts
+ * — data-stagger="split-left" and data-stagger="split-right" — sit on either
+ * side of the centered logo (SplitHeader.tsx) and slide in from the outer
+ * edges toward it, performing the "split" the nav style is named for. Reuses
+ * the generic [data-stagger][data-in] > *:nth-child(n) delay rules above for
+ * the per-link cascade within each wing.
+ *
+ * IMPORTANT: the "to" keyframe ends at `transform: none`, not
+ * `translateX(0)`. Those are visually identical, but translateX(0) computes
+ * to a non-none matrix — which, left behind after the animation completes
+ * (fill-mode: both), permanently creates a new stacking context on the
+ * animated element. That silently traps the mega-menu dropdown's z-index
+ * inside it, so the dropdown can no longer out-rank the header's own
+ * ::after horizon hairline (which lives one level up, in the header's own
+ * stacking context) — the hairline was winning and painting a bright line
+ * straight across the open dropdown. Ending at the literal `none` keyword
+ * animates identically and lets the element return to having no stacking
+ * context of its own once the reveal finishes.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@keyframes splitInLeft  { from { opacity: 0; transform: translateX(-1.25rem); } to { opacity: 1; transform: none; } }
+@keyframes splitInRight { from { opacity: 0; transform: translateX(1.25rem); }  to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .motion-ready [data-stagger="split-left"]:not([data-in])  > * { opacity: 0; transform: translateX(-1.25rem); }
+  .motion-ready [data-stagger="split-right"]:not([data-in]) > * { opacity: 0; transform: translateX(1.25rem); }
+
+  [data-stagger="split-left"][data-in]  > * { animation: splitInLeft  var(--ot-dur-slow) var(--ot-ease-kinetic) both; }
+  [data-stagger="split-right"][data-in] > * { animation: splitInRight var(--ot-dur-slow) var(--ot-ease-kinetic) both; }
+}
+
+/* ── Split-bar masthead shell ────────────────────────────────────────────────
+ * The split-bar header (SplitHeaderShell.tsx) starts fully transparent on
+ * desktop — logo and nav read directly against the hero. Past the scroll
+ * threshold it crossfades to a glass surface and gains a brand→accent
+ * horizon hairline along the bottom edge — the same motif as the mega-menu
+ * dropdown and the footer, so the material change reads as one system rather
+ * than a one-off transition. Mobile keeps its own static glass bar (Tailwind
+ * classes on the header itself) and is untouched by this — scoped to lg+.
+ *
+ * Only paint properties animate (background-color, box-shadow,
+ * backdrop-filter, opacity) plus a transform:scale() on the logo — never a
+ * layout property — so the transition never reflows the page underneath the
+ * sticky header.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .split-shell {
+    background-color: transparent;
+    box-shadow: none;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    transition:
+      background-color var(--ot-dur-base) var(--ot-ease-kinetic),
+      box-shadow        var(--ot-dur-base) var(--ot-ease-kinetic),
+      backdrop-filter   var(--ot-dur-base) var(--ot-ease-kinetic);
+  }
+  .split-shell[data-scrolled="true"] {
+    background-color: color-mix(in oklch, var(--ot-surface) 88%, transparent);
+    box-shadow: 0 8px 32px var(--ot-bloom-brand-faint);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+
+  /* Horizon hairline — brand → accent gradient, fades in with the glass.
+   * z-index: -1 is load-bearing, not decorative: the mega-menu dropdown
+   * (DesktopNav.tsx) extends down through this same region when open, and
+   * must always paint above this line. z-index: auto would normally lose to
+   * the dropdown's explicit z-50 within their shared stacking context, but
+   * a completed CSS animation with fill-mode: both on an ancestor (the
+   * split-left/split-right entrance reveal) can leave that ancestor with a
+   * non-none resolved transform — which creates a stacking context of its
+   * own and traps the dropdown's z-index inside it, letting a z-index:auto
+   * sibling like this hairline win regardless of the dropdown's z-50. This
+   * varies by browser (observed correct in Chromium, broken in Safari) —
+   * rather than depend on every engine releasing that stacking context
+   * identically, pin this to z-index: -1 so it structurally cannot outrank
+   * *any* real content, independent of what any animation leaves behind.
+   * It still paints above the header's own background (that's the element's
+   * own box, category 1 — earlier than any z-index) so the line stays
+   * visible against the glass; it only loses to actual descendants. */
+  .split-shell::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--ot-brand) 20%, var(--ot-accent) 80%, transparent);
+    opacity: 0;
+    transition: opacity var(--ot-dur-base) var(--ot-ease-kinetic);
+  }
+  .split-shell[data-scrolled="true"]::after { opacity: 1; }
+
+  /* Logo settles to a smaller scale once the shell is glass */
+  .split-shell .split-logo {
+    transition: transform var(--ot-dur-base) var(--ot-ease-kinetic);
+  }
+  .split-shell[data-scrolled="true"] .split-logo {
+    transform: scale(0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .split-shell,
+  .split-shell::after,
+  .split-shell .split-logo {
+    transition: none;
+  }
+}
+
 body {
   background: var(--ot-canvas);
   color: var(--ot-fg);
