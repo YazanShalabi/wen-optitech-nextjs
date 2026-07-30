@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { ICON_REGISTRY, type IconKey } from '@/components/icons/iconRegistry'
 
@@ -37,8 +38,16 @@ const GROUP_GAP = {
   split:   'gap-xl',
 } as const
 
+function matchHref(pathname: string, href: string) {
+  if (!href || href === '#') return { exact: false, section: false }
+  const exact = pathname === href
+  const section = exact || (href !== '/' && pathname.startsWith(`${href}/`))
+  return { exact, section }
+}
+
 export default function DesktopNav({ navItems, variant = 'default', ariaLabel = 'Primary navigation' }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const pathname = usePathname()
   const navRef = useRef<HTMLElement>(null)
 
   const close = useCallback(() => setOpenIndex(null), [])
@@ -64,26 +73,39 @@ export default function DesktopNav({ navItems, variant = 'default', ariaLabel = 
   return (
     <nav ref={navRef} className={`hidden lg:flex items-center ${GROUP_GAP[variant]}`} aria-label={ariaLabel}>
       {navItems.map((item, i) => {
-        const hasChildren = !!item.children?.length
-        const isOpen      = openIndex === i
+        const hasChildren   = !!item.children?.length
+        const isOpen        = openIndex === i
+        const self          = matchHref(pathname, item.href)
+        const childActive   = hasChildren
+          ? item.children!.some(c => matchHref(pathname, c.href).section)
+          : false
+        const sectionActive = self.section || childActive
 
         if (!hasChildren) {
           return (
             <Link
               key={item.label}
               href={item.href}
-              className={`relative group py-xs transition-colors duration-150 ease-quick ${linkVoice}`}
+              aria-current={self.exact ? 'page' : undefined}
+              className={[
+                'relative group flex items-center px-sm py-xs rounded-ot-control transition-all duration-150 ease-quick',
+                sectionActive
+                  ? 'bg-brand/10 text-fg! font-semibold'
+                  : linkVoice,
+              ].join(' ')}
             >
               {item.label}
-              {/* Kinetic underline — scales in from center on hover */}
-              <span
-                aria-hidden="true"
-                className="absolute bottom-0 left-0 right-0 h-px bg-brand scale-x-0 group-hover:scale-x-100 transition-transform origin-center"
-                style={{
-                  transitionDuration: '220ms',
-                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-              />
+              {/* Kinetic underline — only on hover when not active */}
+              {!sectionActive && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-0 right-0 h-px bg-brand scale-x-0 group-hover:scale-x-100 transition-transform origin-center"
+                  style={{
+                    transitionDuration: '220ms',
+                    transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                />
+              )}
             </Link>
           )
         }
@@ -96,13 +118,12 @@ export default function DesktopNav({ navItems, variant = 'default', ariaLabel = 
               aria-expanded={isOpen}
               aria-haspopup="true"
               onClick={() => setOpenIndex(isOpen ? null : i)}
-              className={`relative group flex items-center gap-xs py-xs transition-colors duration-150 ease-quick ${linkVoice} ${
-                // Open state gets a clear focus treatment: full-opacity ink plus
-                // bolder weight. A no-op on the split-bar voice (already
-                // font-semibold at rest) but gives the top-bar's font-medium
-                // baseline a real, visible "this is expanded" signal.
-                isOpen ? 'text-fg! font-semibold' : ''
-              }`}
+              className={[
+                'relative group flex items-center gap-xs px-sm py-xs rounded-ot-control transition-all duration-150 ease-quick',
+                sectionActive
+                  ? 'bg-brand/10 text-fg! font-semibold'
+                  : `${linkVoice} ${isOpen ? 'text-fg! font-semibold' : ''}`,
+              ].join(' ')}
             >
               {item.label}
               <svg
@@ -115,16 +136,18 @@ export default function DesktopNav({ navItems, variant = 'default', ariaLabel = 
               >
                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {/* Kinetic underline — stays extended while open */}
-              <span
-                aria-hidden="true"
-                className="absolute bottom-0 left-0 right-0 h-px bg-brand origin-center transition-transform"
-                style={{
-                  transform: isOpen ? 'scaleX(1)' : 'scaleX(0)',
-                  transitionDuration: '220ms',
-                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-              />
+              {/* Kinetic underline — shows while open but not when pill is active */}
+              {!sectionActive && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-0 right-0 h-px bg-brand origin-center transition-transform"
+                  style={{
+                    transform: isOpen ? 'scaleX(1)' : 'scaleX(0)',
+                    transitionDuration: '220ms',
+                    transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                />
+              )}
             </button>
 
             {/* ── Feature dropdown panel ──────────────────────────────────────────
