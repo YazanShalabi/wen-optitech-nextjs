@@ -12,8 +12,14 @@ import { useTranslation } from '@/lib/i18n/useTranslation'
 
 function matchHref(pathname: string, href: string) {
   if (!href || href === '#') return { exact: false, section: false }
-  const exact = pathname === href
-  const section = exact || (href !== '/' && pathname.startsWith(`${href}/`))
+  let path = href
+  if (href.startsWith('http')) {
+    try { path = new URL(href).pathname } catch { return { exact: false, section: false } }
+  }
+  const normPath     = path     === '/' ? path     : path.replace(/\/$/, '')
+  const normPathname = pathname === '/' ? pathname : pathname.replace(/\/$/, '')
+  const exact   = normPathname === normPath
+  const section = exact || (normPath !== '/' && normPathname.startsWith(`${normPath}/`))
   return { exact, section }
 }
 
