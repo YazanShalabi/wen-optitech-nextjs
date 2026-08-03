@@ -141,6 +141,7 @@ const THEME_QUERY = `
         contentRecsApiKey
         contentRecsClientId
         contentRecsDeliveryId
+        googleAnalyticsId
         primaryNavigation {
           menuLink { text title target url { default } }
           subNavItems {
