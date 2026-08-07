@@ -234,11 +234,11 @@ function BubbleQuote({ quote, attribution, color, size, alignment, pa }: Treatme
               Tail is a sibling to the card so overflow-hidden on the card doesn't clip it. */}
           <div className={cn(shadowClass, "relative rounded-3xl motion-safe:animate-slide-up")}>
             <div
-              className={cn("rounded-3xl px-8 py-8 overflow-hidden", bubbleBgClass)}
+              className={cn("relative rounded-3xl px-8 py-8 overflow-hidden", bubbleBgClass)}
               style={isBrand ? { background: "oklch(97% 0.004 195)" } : undefined}
             >
-              {/* Top gradient bar — overflow-hidden clips it cleanly to the card's corners */}
-              <div className={cn("absolute top-0 left-0 right-0 h-0.75", gradientBar)} />
+              {/* Top gradient bar — `relative` on parent + overflow-hidden clips it to the card's border-radius */}
+              <div className={cn("absolute top-0 left-0 right-0 h-1", gradientBar)} />
 
               <div className="grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8">
                 {/* Quote text */}
