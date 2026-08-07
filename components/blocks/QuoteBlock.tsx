@@ -227,16 +227,16 @@ function BubbleQuote({ quote, attribution, color, size, alignment, pa }: Treatme
 
   return (
     <section className={sectionCva({ color, size })}>
-      <div className="mx-auto w-full max-w-3xl">
+      <div className={cn("w-full max-w-3xl", alignment === "center" ? "mx-auto" : "mr-auto")}>
         <figure>
           <div
-            className={cn(shadowClass, "relative rounded-3xl px-8 py-8 motion-safe:animate-slide-up", bubbleBgClass)}
+            className={cn(shadowClass, "relative rounded-3xl px-8 py-8 overflow-hidden motion-safe:animate-slide-up", bubbleBgClass)}
             style={isBrand ? { background: "oklch(97% 0.004 195)" } : undefined}
           >
-            {/* Top gradient bar — edge-to-edge, top corners match card radius */}
-            <div className={cn("absolute top-0 left-0 right-0 h-0.75 rounded-t-3xl", gradientBar)} />
+            {/* Top gradient bar — overflow-hidden on the card clips it to the card's border-radius */}
+            <div className={cn("absolute top-0 left-0 right-0 h-0.75", gradientBar)} />
 
-            <div className={cn("grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8", alignment === "center" && "text-center")}>
+            <div className="grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8">
               {/* Quote text */}
               <p
                 className={cn(
@@ -308,7 +308,7 @@ function GlowQuote({ quote, attribution, color, size, alignment, pa }: Treatment
 
   return (
     <section className={sectionCva({ color: sectionColor, size })}>
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={cn("w-full max-w-4xl", alignment === "center" ? "mx-auto" : "mr-auto")}>
         <figure>
           <div className="relative motion-safe:animate-slide-up">
 
@@ -343,13 +343,13 @@ function GlowQuote({ quote, attribution, color, size, alignment, pa }: Treatment
               </span>
 
               {/* pl-5 pushes text away from the 3px left accent border */}
-              <blockquote className={cn("relative z-10 pl-5", alignment === "center" && "text-center")}>
+              <blockquote className="relative z-10 pl-5">
                 <p className={quoteTextCva({ color: "none", size })} {...pa('quote')}>
                   {quote}
                 </p>
               </blockquote>
 
-              <figcaption className={cn("relative z-10 pl-5 mt-5 pt-4 border-t border-brand/12", alignment === "center" ? "text-center" : "text-right")}>
+              <figcaption className="relative z-10 pl-5 mt-5 pt-4 border-t border-brand/12 text-right">
                 <p
                   className="font-semibold text-[1rem] leading-tight text-fg"
                   {...pa('attributionName')}
