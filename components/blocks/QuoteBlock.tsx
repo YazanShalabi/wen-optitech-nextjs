@@ -220,7 +220,7 @@ function BubbleQuote({ quote, attribution, color, size, alignment, pa }: Treatme
   const gradientBar = isBrand
     ? "bg-gradient-to-r from-fg-on-brand/40 to-accent"
     : "bg-gradient-to-r from-brand/40 to-accent";
-  const iconClass = isBrand ? "text-brand opacity-[0.18]" : "text-brand/20";
+  const iconClass = isBrand ? "text-brand opacity-[0.18]" : "text-accent/20";
   const quoteSize = size === "large"
     ? "text-[clamp(1.55rem,3.2vw,2.3rem)]"
     : "text-[clamp(1.2rem,2.5vw,1.75rem)]";
@@ -229,59 +229,65 @@ function BubbleQuote({ quote, attribution, color, size, alignment, pa }: Treatme
     <section className={sectionCva({ color, size })}>
       <div className={cn("w-full max-w-3xl", alignment === "center" ? "mx-auto" : "mr-auto")}>
         <figure>
-          <div
-            className={cn(shadowClass, "relative rounded-3xl px-8 py-8 overflow-hidden motion-safe:animate-slide-up", bubbleBgClass)}
-            style={isBrand ? { background: "oklch(97% 0.004 195)" } : undefined}
-          >
-            {/* Top gradient bar — overflow-hidden on the card clips it to the card's border-radius */}
-            <div className={cn("absolute top-0 left-0 right-0 h-0.75", gradientBar)} />
+          {/* Outer wrapper: carries the shadow class (sets --bq-tail-color + box-shadow)
+              and is `relative` so the tail span can be positioned against it.
+              Tail is a sibling to the card so overflow-hidden on the card doesn't clip it. */}
+          <div className={cn(shadowClass, "relative rounded-3xl motion-safe:animate-slide-up")}>
+            <div
+              className={cn("rounded-3xl px-8 py-8 overflow-hidden", bubbleBgClass)}
+              style={isBrand ? { background: "oklch(97% 0.004 195)" } : undefined}
+            >
+              {/* Top gradient bar — overflow-hidden clips it cleanly to the card's corners */}
+              <div className={cn("absolute top-0 left-0 right-0 h-0.75", gradientBar)} />
 
-            <div className="grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8">
-              {/* Quote text */}
-              <p
-                className={cn(
-                  "col-start-1 row-start-1 font-sans font-extrabold leading-[1.1] tracking-tight",
-                  quoteSize,
-                  !isBrand && "text-brand",
-                )}
+              <div className="grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8">
+                {/* Quote text */}
+                <p
+                  className={cn(
+                    "col-start-1 row-start-1 font-sans font-extrabold leading-[1.1] tracking-tight",
+                    quoteSize,
+                    !isBrand && "accent-ink",
+                  )}
                 style={isBrand ? { color: "oklch(14% 0.012 195)" } : undefined}
                 {...pa('quote')}
               >
                 {quote}
               </p>
 
-              {/* Decorative Quote icon */}
-              <div aria-hidden="true" className={cn("col-start-2 row-start-1 self-center ml-4", iconClass)}>
-                <Quote className="w-16 h-16" strokeWidth={1.5} />
-              </div>
+                {/* Decorative Quote icon */}
+                <div aria-hidden="true" className={cn("col-start-2 row-start-1 self-center ml-4", iconClass)}>
+                  <Quote className="w-16 h-16" strokeWidth={1.5} />
+                </div>
 
-              {/* Attribution — spans full width below divider */}
-              <figcaption
-                className={cn(
-                  "col-span-2 row-start-2 mt-6 pt-4",
-                  isBrand ? "border-t" : "border-t border-brand/12",
-                )}
-                style={isBrand ? { borderColor: "oklch(14% 0.012 195 / 0.12)" } : undefined}
-              >
-                <p
-                  className={cn("font-semibold text-[1rem] leading-tight", !isBrand && "text-fg")}
-                  style={isBrand ? { color: "oklch(14% 0.012 195)" } : undefined}
-                  {...pa('attributionName')}
+                {/* Attribution — spans full width below divider */}
+                <figcaption
+                  className={cn(
+                    "col-span-2 row-start-2 mt-6 pt-4",
+                    isBrand ? "border-t" : "border-t border-brand/12",
+                  )}
+                  style={isBrand ? { borderColor: "oklch(14% 0.012 195 / 0.12)" } : undefined}
                 >
-                  {attribution.name}
-                </p>
-                {attribution.title && (
                   <p
-                    className={cn("text-label font-normal tracking-label uppercase mt-xs", !isBrand && "text-fg-muted")}
-                    style={isBrand ? { color: "oklch(14% 0.012 195 / 0.5)" } : undefined}
-                    {...pa('attributionTitle')}
+                    className={cn("font-semibold text-[1rem] leading-tight", !isBrand && "text-fg")}
+                    style={isBrand ? { color: "oklch(14% 0.012 195)" } : undefined}
+                    {...pa('attributionName')}
                   >
-                    {attribution.title}
+                    {attribution.name}
                   </p>
-                )}
-              </figcaption>
+                  {attribution.title && (
+                    <p
+                      className={cn("text-label font-normal tracking-label uppercase mt-xs", !isBrand && "text-fg-muted")}
+                      style={isBrand ? { color: "oklch(14% 0.012 195 / 0.5)" } : undefined}
+                      {...pa('attributionTitle')}
+                    >
+                      {attribution.title}
+                    </p>
+                  )}
+                </figcaption>
+              </div>
             </div>
 
+            {/* Tail — sibling to the card so overflow-hidden doesn't clip it */}
             <span className="bq-tail" aria-hidden="true" />
           </div>
         </figure>
