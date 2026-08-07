@@ -295,6 +295,83 @@ html {
     drop-shadow(0 0 0.80em oklch(from var(--ot-brand)  l c h / 0.32));
 }
 
+/* ── Quote Block · Bubble treatment ─────────────────────────────────────────
+ * Three shadow classes set --bq-tail-color so the CSS triangle tail colour
+ * auto-matches the bubble surface without separate overrides.               */
+.bq-bubble-shadow-brand {
+  --bq-tail-color: oklch(97% 0.004 195);
+  box-shadow:
+    0 4px 28px oklch(from var(--ot-brand) l c h / 0.28),
+    0 1px 6px  oklch(from var(--ot-brand) l c h / 0.14);
+}
+.bq-bubble-shadow-canvas {
+  --bq-tail-color: var(--ot-surface);
+  box-shadow:
+    0 4px 20px oklch(from var(--ot-fg) l c h / 0.08),
+    0 1px 4px  oklch(from var(--ot-fg) l c h / 0.05);
+}
+.bq-bubble-shadow-surface {
+  --bq-tail-color: var(--ot-canvas);
+  box-shadow:
+    0 4px 20px oklch(from var(--ot-fg) l c h / 0.08),
+    0 1px 4px  oklch(from var(--ot-fg) l c h / 0.05);
+}
+.bq-tail {
+  position: absolute;
+  bottom: -20px;
+  left: 3rem;
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-top: 20px solid var(--bq-tail-color);
+}
+
+/* ── Quote Block · Glow treatment ───────────────────────────────────────────
+ * Single card; chromatic box-shadow bloom adapts to theme (no forced dark).
+ *
+ *   .quote-glow-card  — the card; multi-layer brand + accent bloom
+ *   .quote-glow-mark  — visible ❝ mark (28%); text-shadow leaks outside the
+ *                       card and layers with box-shadow as a secondary bloom
+ *
+ * Dark mode (default): strong neon-border ring, matching image block intensity.
+ * Light mode: softer ambient glow that still reads as a chromatic effect.      */
+
+/* ── Quote card ─────────────────────────────────────────────────────────────── */
+.quote-glow-card {
+  box-shadow:
+    0 0 0 1px   oklch(from var(--ot-brand)  l c h / 0.55),
+    0 0 8px 2px oklch(from var(--ot-brand)  l c h / 0.42),
+    0 0 24px 6px oklch(from var(--ot-brand) l c h / 0.26),
+    0 0 60px 12px oklch(from var(--ot-brand) l c h / 0.14),
+    0 4px 32px  oklch(from var(--ot-accent) l c h / 0.14),
+    inset 0 0 18px oklch(from var(--ot-brand) l c h / 0.05);
+}
+
+[data-theme="light"] .quote-glow-card {
+  box-shadow:
+    0 0 0 1px   oklch(from var(--ot-brand)  l c h / 0.25),
+    0 0 8px 2px oklch(from var(--ot-brand)  l c h / 0.18),
+    0 4px 24px  oklch(from var(--ot-brand)  l c h / 0.12),
+    0 4px 10px  oklch(from var(--ot-accent) l c h / 0.08);
+}
+
+/* ── Mark (secondary bloom source) ─────────────────────────────────────────── */
+/* Mark is text-brand/[0.28] — visible as a glyph. Text-shadow radiates outward
+   beyond the card border (no overflow:hidden on the card), layering with the
+   box-shadow bloom to create a second focal point inside the composition.      */
+.quote-glow-mark {
+  text-shadow:
+    0 0 0.30em oklch(from var(--ot-brand)  l c h / 0.55),
+    0 0 1.20em oklch(from var(--ot-brand)  l c h / 0.30),
+    0 0 3.50em oklch(from var(--ot-brand)  l c h / 0.18),
+    0 0 0.22em oklch(from var(--ot-accent) l c h / 0.22);
+  filter:
+    drop-shadow(0 0 0.12em oklch(from var(--ot-brand)  l c h / 0.65))
+    drop-shadow(0 0 0.90em oklch(from var(--ot-accent) l c h / 0.30));
+}
+
 /* ── ScrollToTop ─────────────────────────────────────────────────────────────
  *
  * .scroll-top-btn
