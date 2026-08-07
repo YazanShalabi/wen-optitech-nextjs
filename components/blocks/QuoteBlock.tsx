@@ -127,10 +127,10 @@ export default function QuoteBlock({
   } = styleOptions;
 
   if (treatment === "bubble") {
-    return <BubbleQuote quote={quote} attribution={attribution} color={color} size={size} pa={pa} />;
+    return <BubbleQuote quote={quote} attribution={attribution} color={color} size={size} alignment={alignment} pa={pa} />;
   }
   if (treatment === "glow") {
-    return <GlowQuote quote={quote} attribution={attribution} color={color} size={size} pa={pa} />;
+    return <GlowQuote quote={quote} attribution={attribution} color={color} size={size} alignment={alignment} pa={pa} />;
   }
 
   // ── Default treatment ──────────────────────────────────────────────────────
@@ -195,6 +195,7 @@ type TreatmentProps = {
   attribution: { name: string; title?: string };
   color: NonNullable<QuoteStyleOptions["color"]>;
   size: NonNullable<QuoteStyleOptions["size"]>;
+  alignment: NonNullable<QuoteStyleOptions["alignment"]>;
   pa: NonNullable<QuoteBlockProps["pa"]>;
 };
 
@@ -206,7 +207,7 @@ type TreatmentProps = {
 // A CSS triangle tail hangs from the bottom-left via .bq-tail, which reads
 // --bq-tail-color set by the shadow class — no per-variant color override needed.
 
-function BubbleQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
+function BubbleQuote({ quote, attribution, color, size, alignment, pa }: TreatmentProps) {
   const isBrand = color === "brand";
   const shadowClass = color === "brand"
     ? "bq-bubble-shadow-brand"
@@ -219,7 +220,7 @@ function BubbleQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
   const gradientBar = isBrand
     ? "bg-gradient-to-r from-fg-on-brand/40 to-accent"
     : "bg-gradient-to-r from-brand/40 to-accent";
-  const iconClass = isBrand ? "text-brand opacity-[0.18]" : "text-brand/20 dark:text-accent/20";
+  const iconClass = isBrand ? "text-brand opacity-[0.18]" : "text-brand/20";
   const quoteSize = size === "large"
     ? "text-[clamp(1.55rem,3.2vw,2.3rem)]"
     : "text-[clamp(1.2rem,2.5vw,1.75rem)]";
@@ -232,16 +233,16 @@ function BubbleQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
             className={cn(shadowClass, "relative rounded-3xl px-8 py-8 motion-safe:animate-slide-up", bubbleBgClass)}
             style={isBrand ? { background: "oklch(97% 0.004 195)" } : undefined}
           >
-            {/* Top gradient bar */}
-            <div className={cn("absolute top-0 left-8 right-8 h-0.75 rounded-b-sm", gradientBar)} />
+            {/* Top gradient bar — edge-to-edge, top corners match card radius */}
+            <div className={cn("absolute top-0 left-0 right-0 h-0.75 rounded-t-3xl", gradientBar)} />
 
-            <div className="grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8">
+            <div className={cn("grid grid-cols-[1fr_auto] grid-rows-[1fr_auto] gap-x-8", alignment === "center" && "text-center")}>
               {/* Quote text */}
               <p
                 className={cn(
                   "col-start-1 row-start-1 font-sans font-extrabold leading-[1.1] tracking-tight",
                   quoteSize,
-                  !isBrand && "text-brand dark:text-accent",
+                  !isBrand && "text-brand",
                 )}
                 style={isBrand ? { color: "oklch(14% 0.012 195)" } : undefined}
                 {...pa('quote')}
@@ -301,7 +302,7 @@ function BubbleQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
 // (bloom on dark field) and softer in light mode (bloom on light field).
 // brand color → section bg mapped to canvas so the badge reads on a neutral field.
 
-function GlowQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
+function GlowQuote({ quote, attribution, color, size, alignment, pa }: TreatmentProps) {
   const sectionColor = (color === "brand" ? "canvas" : color) as QuoteStyleOptions["color"];
   const cardBg       = sectionColor === "surface" ? "bg-canvas" : "bg-surface";
 
@@ -342,13 +343,13 @@ function GlowQuote({ quote, attribution, color, size, pa }: TreatmentProps) {
               </span>
 
               {/* pl-5 pushes text away from the 3px left accent border */}
-              <blockquote className="relative z-10 pl-5">
+              <blockquote className={cn("relative z-10 pl-5", alignment === "center" && "text-center")}>
                 <p className={quoteTextCva({ color: "none", size })} {...pa('quote')}>
                   {quote}
                 </p>
               </blockquote>
 
-              <figcaption className="relative z-10 pl-5 mt-5 pt-4 border-t border-brand/12 text-right">
+              <figcaption className={cn("relative z-10 pl-5 mt-5 pt-4 border-t border-brand/12", alignment === "center" ? "text-center" : "text-right")}>
                 <p
                   className="font-semibold text-[1rem] leading-tight text-fg"
                   {...pa('attributionName')}
