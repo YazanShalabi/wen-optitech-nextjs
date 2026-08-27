@@ -25,7 +25,7 @@ const sectionCva = cva(
       size: {
         large:   'min-h-[clamp(400px,50vh,560px)] py-xl',
         compact: 'min-h-[clamp(240px,30vh,360px)] py-lg',
-        display: 'min-h-[clamp(480px,60vh,720px)] py-2xl',
+        display: 'min-h-[clamp(440px,55vh,640px)] py-xl',
       },
     },
     defaultVariants: { size: 'large' },
