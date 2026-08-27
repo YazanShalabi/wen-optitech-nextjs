@@ -3,7 +3,8 @@
 import { BlockPlayground } from '../playground'
 import OT_BannerBlock from '@/cms/components/OT_BannerBlock'
 
-const BANNER_IMG = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1600&q=80&fit=crop'
+const BANNER_IMG   = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1600&q=80&fit=crop'
+const BANNER_VIDEO = '/video/background-sample.mp4'
 
 const DEMO_CONTENT = {
   heading:           'Confidence is a competitive advantage.',
@@ -18,7 +19,7 @@ const DEMO_CONTENT = {
 export default function BannerPlayground() {
   return (
     <BlockPlayground
-      defaults={{ treatment: 'scrim', color: 'canvas', alignment: 'center', size: 'large', image: 'yes' }}
+      defaults={{ treatment: 'scrim', color: 'canvas', alignment: 'center', size: 'large', media: 'image' }}
       controls={[
         {
           type: 'buttons',
@@ -59,21 +60,31 @@ export default function BannerPlayground() {
         },
         {
           type: 'buttons',
-          key: 'image',
-          label: 'Image',
+          key: 'media',
+          label: 'Media',
           options: [
-            { label: 'Yes', value: 'yes' },
-            { label: 'No',  value: 'no'  },
+            { label: 'Image',         value: 'image'         },
+            { label: 'Video',         value: 'video'         },
+            { label: 'Video + Poster', value: 'video-poster' },
+            { label: 'None',          value: 'none'          },
           ],
         },
       ]}
     >
-      {s => (
-        <OT_BannerBlock
-          content={s.image === 'yes' ? { ...DEMO_CONTENT, backgroundImage: BANNER_IMG } as any : DEMO_CONTENT as any}
-          displaySettings={{ treatment: s.treatment, color: s.color, alignment: s.alignment, size: s.size, imageBlend: 'overlay' }}
-        />
-      )}
+      {s => {
+        const mediaContent =
+          s.media === 'image'         ? { backgroundImage: BANNER_IMG } :
+          s.media === 'video'         ? { backgroundVideo: BANNER_VIDEO } :
+          s.media === 'video-poster'  ? { backgroundVideo: BANNER_VIDEO, backgroundImage: BANNER_IMG } :
+          {}
+
+        return (
+          <OT_BannerBlock
+            content={{ ...DEMO_CONTENT, ...mediaContent } as any}
+            displaySettings={{ treatment: s.treatment, color: s.color, alignment: s.alignment, size: s.size, imageBlend: 'overlay' }}
+          />
+        )
+      }}
     </BlockPlayground>
   )
 }

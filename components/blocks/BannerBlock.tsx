@@ -4,6 +4,7 @@ import { cva } from 'class-variance-authority'
 import { cn }  from '@/lib/utils'
 import { RichText } from '@optimizely/cms-sdk/react/richText'
 import BannerEntrance from './BannerEntrance'
+import BannerBackgroundVideo from './BannerBackgroundVideo'
 
 // ─── Style option types ───────────────────────────────────────────────────────
 
@@ -120,23 +121,25 @@ const secondaryCtaCva = cva(
 
 // ─── Scrim / background class helper ────────────────────────────────────────
 //
-// No image (scrim):  this layer IS the banner background, so it uses the FULL
+// No media (scrim):  this layer IS the banner background, so it uses the FULL
 //                    solid color — a partial alpha would wash the brand out
 //                    (the brand color must read as the brand color, not a tint).
-// Image (scrim):     a colored overlay so the photo reads through, tinted to the
-//                    color; opacity scales with imageBlend (overlay = lighter,
-//                    multiply = heavier press).
+// Media (scrim):     a colored overlay so the image/video reads through, tinted
+//                    to the color; opacity scales with imageBlend (overlay =
+//                    lighter, multiply = heavier press). Same treatment for
+//                    video as image — it's keyed on "is there something busy
+//                    behind the text," not on the media type.
 // Glass:             intentionally translucent frosted panel (its identity);
-//                    left as-is whether or not there's an image.
+//                    left as-is whether or not there's media behind it.
 
 function getScrimClass(
   color:       string,
   imageBlend:  string,
   treatment:   string,
-  hasImage:    boolean,
+  hasMedia:    boolean,
 ): string {
   if (treatment === 'glass') {
-    if (!hasImage) {
+    if (!hasMedia) {
       // Rich gradient backdrops — give backdrop-filter tonal variance to frost over.
       // A flat solid color makes backdrop-filter invisible; these give it something.
       const map: Record<string, string> = {
@@ -146,7 +149,7 @@ function getScrimClass(
       }
       return map[color] ?? 'banner-bg-canvas-glass'
     }
-    // With image: very light tint so the photo bleeds through strongly.
+    // With media: very light tint so the image/video bleeds through strongly.
     // The glass panel + heavy blur handle legibility; the overlay only adds subtle color.
     const map: Record<string, string> = {
       canvas:  'bg-canvas/15',
@@ -155,8 +158,8 @@ function getScrimClass(
     }
     return map[color] ?? 'bg-canvas/15'
   }
-  // Solid color background when there is no image to show through.
-  if (!hasImage) {
+  // Solid color background when there is no image/video to show through.
+  if (!hasMedia) {
     const solid: Record<string, string> = {
       canvas:  'bg-canvas',
       surface: 'bg-surface',
@@ -164,7 +167,7 @@ function getScrimClass(
     }
     return solid[color] ?? 'bg-canvas'
   }
-  // Colored overlay over an image.
+  // Colored overlay over an image or video.
   const isMultiply = imageBlend === 'multiply'
   const map: Record<string, [string, string]> = {
     canvas:  ['bg-canvas/80',  'bg-canvas/90'],
@@ -183,6 +186,7 @@ export type BannerBlockProps = {
   eyebrow?:      string
   body?:         Parameters<typeof RichText>[0]['content'] | null
   bgImageSrc?:   string
+  bgVideoSrc?:   string
   primaryCta?:   { label: string; href: string }
   secondaryCta?: { label: string; href: string }
   styleOptions?: BannerStyleOptions
@@ -195,6 +199,7 @@ export default function BannerBlock({
   eyebrow,
   body,
   bgImageSrc,
+  bgVideoSrc,
   primaryCta,
   secondaryCta,
   styleOptions = {},
@@ -212,17 +217,19 @@ export default function BannerBlock({
   const isBrand    = color === 'brand'
   const isCentered = alignment === 'center'
   const hasImage   = Boolean(bgImageSrc)
-  const scrimClass = getScrimClass(color, imageBlend, treatment, hasImage)
+  const hasVideo   = Boolean(bgVideoSrc)
+  const hasMedia   = hasImage || hasVideo
+  const scrimClass = getScrimClass(color, imageBlend, treatment, hasMedia)
   const Heading    = headingLevel
 
   // ── Content elements (shared between scrim and glass layouts) ──────────────
-  // When an image sits behind the label, accent-as-text is hard to read, so the
-  // eyebrow becomes a filled accent pill (accent background + assigned
-  // fg-on-accent text) for guaranteed contrast. Without an image it keeps the
-  // per-color text treatment. The outer <p> retains `banner-eyebrow` either way
-  // so the entrance animation still targets it.
+  // When an image or video sits behind the label, accent-as-text is hard to
+  // read, so the eyebrow becomes a filled accent pill (accent background +
+  // assigned fg-on-accent text) for guaranteed contrast. Without media it
+  // keeps the per-color text treatment. The outer <p> retains `banner-eyebrow`
+  // either way so the entrance animation still targets it.
   const eyebrowEl = eyebrow ? (
-    hasImage ? (
+    hasMedia ? (
       <p className="banner-eyebrow" {...pa('eyebrow')}>
         <span className="inline-flex items-center rounded-ot-control px-sm py-0.75 bg-accent text-fg-on-accent text-label uppercase tracking-label font-semibold">
           {eyebrow}
@@ -285,13 +292,20 @@ export default function BannerBlock({
   return (
     <section
       className={sectionCva({ size })}
-      data-theme={isBrand || hasImage ? 'dark' : undefined}
+      data-theme={isBrand || hasMedia ? 'dark' : undefined}
     >
 
       {/* ── Background layer (z-0, absolute inset) ─────────────────────── */}
       <div className="absolute inset-0 z-0" aria-hidden="true">
-        {/* Background image */}
-        {hasImage && (
+        {/* Background video takes precedence over the image; the image (when
+            also present) becomes the video's poster frame. */}
+        {hasVideo ? (
+          <BannerBackgroundVideo
+            src={bgVideoSrc!}
+            poster={bgImageSrc}
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        ) : hasImage ? (
           <Image
             src={bgImageSrc!}
             alt=""
@@ -304,19 +318,19 @@ export default function BannerBlock({
             quality={85}
             className="object-cover object-center"
           />
-        )}
+        ) : null}
 
         {/* Glass mode: extra base darkener so the panel has something to
-            contrast against even when the image is light */}
-        {isGlass && hasImage && (
+            contrast against even when the image/video is light */}
+        {isGlass && hasMedia && (
           <div className="absolute inset-0 bg-canvas/35" />
         )}
 
         {/* Scrim: color identity layer (controls how brand/canvas/surface reads) */}
         <div className={cn('absolute inset-0', scrimClass)} />
 
-        {/* Vignette: subtle radial corner darkening; only with an image */}
-        {hasImage && <div className="banner-vignette absolute inset-0" />}
+        {/* Vignette: subtle radial corner darkening; only with image/video */}
+        {hasMedia && <div className="banner-vignette absolute inset-0" />}
 
         {/* Brand bloom: radial warm halo centered behind content */}
         {isBrand && <div className="banner-brand-bloom absolute inset-0" />}
@@ -330,17 +344,22 @@ export default function BannerBlock({
 
         {isGlass ? (
           /* Glass treatment: content inside a frosted glass panel */
-          <div className={cn(
-            'flex flex-col',
-            gapClass,
-            size === 'large' ? 'px-xl py-xl' : isDisplay ? 'px-xl py-2xl' : 'px-lg py-lg',
-            isCentered
-              ? `items-center text-center ${isDisplay ? 'max-w-250' : 'max-w-160'} w-full`
-              : `items-start text-left  ${isDisplay ? 'max-w-225' : 'max-w-140'} w-full`,
-            isBrand             ? 'banner-glass-brand'
-            : color === 'surface' ? 'banner-glass-surface'
-            : 'banner-glass',
-          )}>
+          <div
+            className={cn(
+              'flex flex-col',
+              gapClass,
+              size === 'large' ? 'px-xl py-xl' : isDisplay ? 'px-xl py-2xl' : 'px-lg py-lg',
+              isCentered
+                ? `items-center text-center ${isDisplay ? 'max-w-250' : 'max-w-160'} w-full`
+                : `items-start text-left  ${isDisplay ? 'max-w-225' : 'max-w-140'} w-full`,
+              isBrand             ? 'banner-glass-brand'
+              : color === 'surface' ? 'banner-glass-surface'
+              : 'banner-glass',
+            )}
+            // Motion under glass reads busier than a static photo at the same
+            // blur level, so video gets a touch more blur/tint (globals.css).
+            data-media={hasVideo ? 'video' : undefined}
+          >
             {eyebrowEl}
             {headingEl}
             {bodyEl}

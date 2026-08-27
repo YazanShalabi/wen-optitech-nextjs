@@ -3438,10 +3438,11 @@ body {
 
 /* ── BannerBlock ──────────────────────────────────────────────────────────────
  *
- * Background image + scrim block with two rendering modes:
+ * Background image or looping muted video + scrim block, two rendering modes:
  *
- *   scrim    — full-bleed color scrim over the image; text sits directly on it
+ *   scrim    — full-bleed color scrim over the media; text sits directly on it
  *   glass    — lighter scrim; content is placed inside a frosted glass panel
+ *              (video gets extra blur/opacity via [data-media="video"] below)
  *
  * Scrim is implemented as Tailwind opacity classes applied inline (see
  * BannerBlock.tsx). These CSS rules handle the decorative layers and entrance.
@@ -3581,6 +3582,28 @@ body {
     0 8px 48px var(--ot-bloom-brand-faint),
     0 24px 72px oklch(from var(--ot-brand) calc(l * 0.55) c h / 0.18),
     inset 0 1px 0 oklch(from var(--ot-brand) calc(l * 1.50) calc(c * 0.14) h / 0.44);
+}
+
+/* Glass over video: motion under glass reads busier than a static photo at
+   the same blur level, so video gets a touch more blur + a slightly more
+   opaque base to settle the moving image beneath it. Tint/border/shadow
+   character is unchanged — only blur and base opacity move. */
+.banner-glass[data-media="video"] {
+  background: oklch(from var(--ot-canvas) l c h / 0.62);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+.banner-glass-surface[data-media="video"] {
+  background: oklch(from var(--ot-surface) l c h / 0.70);
+  backdrop-filter: blur(32px) saturate(155%);
+  -webkit-backdrop-filter: blur(32px) saturate(155%);
+}
+
+.banner-glass-brand[data-media="video"] {
+  background: oklch(from var(--ot-brand) calc(l * 1.35) calc(c * 0.16) h / 0.28);
+  backdrop-filter: blur(42px) saturate(210%);
+  -webkit-backdrop-filter: blur(42px) saturate(210%);
 }
 
 /* ── Centered banner eyebrow — light-mode accent pill ──────────────────────────
