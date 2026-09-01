@@ -229,7 +229,17 @@ export async function getLocalizedContentByPath(
   // ── Default locale ────────────────────────────────────────────────────────
   if (locale === DEFAULT_LOCALE) {
     const results = await getClient().getContentByPath(path, { host, variation })
-    return results?.length ? pickByLocale(results, locale) : null
+    if (results?.length) return pickByLocale(results, locale)
+
+    // Fallback: once a CMS instance has more than one language enabled,
+    // Optimizely Graph prefixes ALL content paths with the locale segment —
+    // including the default locale — even for a channel's designated start
+    // page. Content published while the instance had a single language keeps
+    // an unprefixed path, but anything published/republished after
+    // multi-language was turned on gets `/${locale}${path}` (e.g. `/en/`).
+    // Try that shape before giving up so both eras of content resolve.
+    const prefixed = await getClient().getContentByPath(`/${locale}${path}`, { host, variation })
+    return prefixed?.length ? pickByLocale(prefixed, locale) : null
   }
 
   // ── Non-default locale: step 1 — locale-prefixed path ─────────────────────
