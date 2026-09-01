@@ -6,6 +6,39 @@ export const BlankExperience = contentType({
   baseType: '_experience',
   mayContainTypes: ['*'], // All child content types allowed
   properties: {
+    // ── PRESERVED FROM THE TARGET CMS INSTANCE ────────────────────────────────
+    // These three properties already exist on BlankExperience in the shared MEA
+    // instance and are used by the other sites on it (ENOC, KSIA, Opti Health,
+    // Mosey Bank).
+    //
+    // A manifest push REPLACES a content type's property set — omitting a
+    // property does not leave it alone, it DELETES it along with any content
+    // stored in it. They are declared here verbatim so `cms:push` stays purely
+    // additive. Do not remove without confirming no site on the target instance
+    // depends on them.
+    BlankExperienceSeoSettings: {
+      type:        'component',
+      contentType: 'PageSeoSettings',
+      displayName: 'SEO Settings',
+      group:       'SeoSettings',
+      sortOrder:   10,
+    },
+    PageAdminSettings: {
+      type:        'component',
+      contentType: 'PageAdminSettings',
+      displayName: 'Page Admin Settings',
+      group:       'AdminSettings',
+      sortOrder:   10,
+    },
+    Schema: {
+      type:        'array',
+      items:       { type: 'richText' },
+      displayName: 'Schema Markup',
+      description: 'JSON-LD schema markup for SEO and AI visibility (String-based to prevent encoding issues)',
+      group:       'SeoSettings',
+      sortOrder:   110,
+    },
+
     // ── SEO / Search & Discovery ──────────────────────────────────────────────
     // Identical field keys to OT_BlogPage so lib/metadata.ts has one code path.
     seoTitle: {
