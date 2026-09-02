@@ -223,3 +223,66 @@ export async function upsertBlogPage(input: UpsertBlogInput): Promise<UpsertResu
   })
   return { action, status: patchRes.status, body: await patchRes.text(), cmsKey }
 }
+
+// ─── Live draft read (CMS editor preview freshness) ──────────────────────────
+//
+// The CMS editor's preview frame renders this app, and the app resolves preview
+// content through Optimizely Graph. Graph only reindexes a draft when it is
+// SAVED or PUBLISHED, so an autosaved edit leaves Graph serving the previous
+// field values: the editor types into a field, the preview does not change, and
+// nothing in the UI explains why. Reading the version straight from the
+// Management API sidesteps the index entirely and always reflects the newest
+// autosave.
+//
+// SECURITY — read before calling:
+// This reads UNPUBLISHED content using the application's own CMS credentials,
+// so it does not itself verify the caller's `preview_token`. Call it only after
+// Graph has already accepted that token for the same content key; Graph is what
+// authenticates preview access. The slug route enforces this by gating on a
+// successful getPreviewContent result. Calling it on an unauthenticated path
+// would disclose drafts to anyone able to reach that route.
+
+/** Draft field values as the CMS stores them (pre-Graph-resolution shapes). */
+export type DraftBlogProperties = {
+  blogStyle?: string
+  headline?: string
+  subHeadline?: string
+  topic?: string
+  /** Raw reference, e.g. `cms://content/<key>` — not a resolved URL. */
+  featuredImage?: string
+  /** Rich text as an HTML string. */
+  body?: string
+  readTime?: string
+}
+
+/**
+ * Current draft properties for a content key, straight from the CMS database.
+ * Returns null when CMS credentials are absent or the draft cannot be read —
+ * callers treat that as "no fresher data" and fall back to the Graph result,
+ * so preview degrades to the old behaviour rather than breaking.
+ */
+export async function getDraftBlogProperties(
+  key: string,
+  locale: string,
+): Promise<DraftBlogProperties | null> {
+  if (!cmsConfigured()) return null
+
+  try {
+    const token     = await getCmsAccessToken()
+    const cmsLocale = await resolveCmsLocale(locale, token)
+    const version   = await getDraftVersion(key, cmsLocale, token)
+    if (!version) return null
+
+    const res = await fetch(`${API}/content/${key}/versions/${version}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+
+    const body = (await res.json()) as { properties?: DraftBlogProperties }
+    return body.properties ?? null
+  } catch {
+    // Never let a preview-freshness lookup break the page render.
+    return null
+  }
+}
