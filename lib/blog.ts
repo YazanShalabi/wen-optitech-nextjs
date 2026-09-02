@@ -314,11 +314,29 @@ export const getLatestBlogPosts = cache(async function getLatestBlogPosts(
 // featuredImage is resolved by looking the referenced asset up in Graph, which
 // works because media assets are published even while the page is a draft.
 
-/** Pulls the asset key out of a `cms://content/<key>` reference. */
-function contentKeyFromRef(ref: string | undefined): string | null {
-  if (!ref) return null
-  const m = /^cms:\/\/content\/([A-Za-z0-9-]+)/.exec(ref.trim())
-  return m ? m[1] : null
+/**
+ * Pulls the asset key out of a featuredImage reference.
+ *
+ * The Management API is not consistent about the shape here: it can come back
+ * as a `cms://content/<key>` string OR as a reference object. An earlier
+ * version of this assumed the string form and called .trim() on it, which threw
+ * `a.trim is not a function` and 500'd the blog route in the CMS editor. Accept
+ * `unknown` and narrow, so a shape this code has not seen returns null instead
+ * of throwing.
+ */
+function contentKeyFromRef(ref: unknown): string | null {
+  if (typeof ref === 'string') {
+    const m = /^cms:\/\/content\/([A-Za-z0-9-]+)/.exec(ref.trim())
+    return m ? m[1] : null
+  }
+  if (ref && typeof ref === 'object') {
+    const o = ref as Record<string, unknown>
+    for (const field of ['key', 'id', 'contentKey', 'guidValue']) {
+      const v = o[field]
+      if (typeof v === 'string' && v) return v.replace(/^cms:\/\/content\//, '')
+    }
+  }
+  return null
 }
 
 /** Resolves a media content key to its delivery URL via Graph. */
@@ -352,6 +370,9 @@ export async function applyDraftOverlay(
 ): Promise<BlogPageContent> {
   if (!draft) return graphContent
 
+  // A preview-freshness nicety must never be able to fail the page render, so
+  // any unexpected shape falls back to the Graph result.
+  try {
   const merged: BlogPageContent = { ...graphContent }
 
   if (draft.headline    !== undefined) merged.headline    = draft.headline
@@ -375,4 +396,8 @@ export async function applyDraftOverlay(
   }
 
   return merged
+  } catch (err) {
+    console.warn('[preview] draft overlay skipped:', err)
+    return graphContent
+  }
 }
