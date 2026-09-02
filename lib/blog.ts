@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { getClient } from '@/lib/optimizely'
+import type { DraftBlogProperties } from '@/lib/cmsApi'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -299,3 +300,79 @@ export const getLatestBlogPosts = cache(async function getLatestBlogPosts(
     return []
   }
 })
+
+// ─── Draft overlay for the CMS editor preview ────────────────────────────────
+//
+// Graph reindexes a draft only on save/publish, so an autosaved edit is missing
+// from the preview render. getDraftBlogProperties reads the live draft from the
+// CMS Management API; this merges those values over the Graph result.
+//
+// The two sources use different shapes for two fields, so this cannot be a
+// plain spread:
+//   body          Graph { html }              CMS  HTML string
+//   featuredImage Graph { url { default } }   CMS  "cms://content/<key>"
+// featuredImage is resolved by looking the referenced asset up in Graph, which
+// works because media assets are published even while the page is a draft.
+
+/** Pulls the asset key out of a `cms://content/<key>` reference. */
+function contentKeyFromRef(ref: string | undefined): string | null {
+  if (!ref) return null
+  const m = /^cms:\/\/content\/([A-Za-z0-9-]+)/.exec(ref.trim())
+  return m ? m[1] : null
+}
+
+/** Resolves a media content key to its delivery URL via Graph. */
+async function resolveMediaUrl(key: string): Promise<string | null> {
+  try {
+    const data = await getClient().request(
+      `query ResolveMedia($key: String!) {
+         _Content(where: { _metadata: { key: { eq: $key } } }, limit: 1) {
+           items { _metadata { url { default } } }
+         }
+       }`,
+      { key },
+    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any)?._Content?.items?.[0]?._metadata?.url?.default ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Overlays live draft values onto the Graph-resolved blog content.
+ *
+ * Only fields the CMS actually returned are overlaid, so a property absent from
+ * the draft response leaves the Graph value untouched. Returns the original
+ * object when there is nothing fresher to apply.
+ */
+export async function applyDraftOverlay(
+  graphContent: BlogPageContent,
+  draft: DraftBlogProperties | null,
+): Promise<BlogPageContent> {
+  if (!draft) return graphContent
+
+  const merged: BlogPageContent = { ...graphContent }
+
+  if (draft.headline    !== undefined) merged.headline    = draft.headline
+  if (draft.subHeadline !== undefined) merged.subHeadline = draft.subHeadline
+  if (draft.topic       !== undefined) merged.topic       = draft.topic
+  if (draft.readTime    !== undefined) merged.readTime    = draft.readTime
+  if (draft.blogStyle   !== undefined) merged.blogStyle   = draft.blogStyle
+
+  // Rich text: string -> { html }
+  if (draft.body !== undefined) merged.body = { html: draft.body }
+
+  // Reference: "cms://content/<key>" -> { url { default } }
+  const imageKey = contentKeyFromRef(draft.featuredImage)
+  if (imageKey) {
+    const url = await resolveMediaUrl(imageKey)
+    if (url) merged.featuredImage = { url: { default: url } }
+  } else if (draft.featuredImage === '' || draft.featuredImage === null) {
+    // Editor cleared the image — reflect the removal rather than keeping the
+    // stale published one.
+    merged.featuredImage = undefined
+  }
+
+  return merged
+}
