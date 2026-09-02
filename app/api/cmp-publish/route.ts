@@ -7,6 +7,7 @@ import {
 } from '@/lib/cmpPreviewStore'
 import { mapCmpPreviewToBlog } from '@/lib/cmpBlog'
 import { cmsConfigured, upsertBlogPage, type BlogPageProperties } from '@/lib/cmsApi'
+import { captureSafeHeaders } from '@/lib/captureHeaders'
 
 // CMP publish webhook — PHASE 4: capture + create/update the blog.
 //
@@ -33,6 +34,7 @@ type CapturedMeta = {
   contentType: string
   query: Record<string, string>
   headers: Record<string, string>
+  withheldHeaders: string[]
 }
 
 // Reads the body without trusting the content-type header (mirrors the preview
@@ -166,15 +168,16 @@ export async function POST(req: NextRequest) {
 
   const body = await readBody(req)
 
-  const REDACT = new Set(['callback-secret', 'authorization', 'cookie'])
+  // Allowlisted capture — see lib/captureHeaders for why a denylist is unsafe on
+  // an endpoint whose captured meta is republished over an unauthenticated GET.
+  const { headers: safeHeaders, withheld: withheldHeaders } = captureSafeHeaders(req.headers)
   const meta: CapturedMeta = {
     receivedAt: new Date().toISOString(),
     method: req.method,
     contentType: req.headers.get('content-type') ?? '',
     query: Object.fromEntries(req.nextUrl.searchParams.entries()),
-    headers: Object.fromEntries(
-      [...req.headers.entries()].filter(([k]) => !REDACT.has(k.toLowerCase())),
-    ),
+    headers: safeHeaders,
+    withheldHeaders,
   }
 
   const eventName = (body as { event_name?: string })?.event_name
