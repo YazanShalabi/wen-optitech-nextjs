@@ -30,6 +30,7 @@ import TopicHubPage            from '@/components/pages/TopicHubPage'
 import Script                  from 'next/script'
 import { DraftStateBanner }    from '@/components/preview/DraftStateBanner'
 import { ExternalPreviewLinkPanel } from '@/components/preview/ExternalPreviewLinkPanel'
+import { PreviewLagNotice }   from '@/components/preview/PreviewLagNotice'
 import { buildPageMetadata, type PageSeoFields } from '@/lib/metadata'
 import { buildJsonLd }         from '@/lib/structured-data'
 import JsonLd                  from '@/components/seo/JsonLd'
@@ -379,6 +380,11 @@ async function CmsPage({ params, searchParams }: Props) {
                 authorName={draftAuthorName}
               />
             )}
+
+            {/* CMS editor: explain why a just-saved edit may not be visible yet.
+                The preview reads from Graph, which reindexes drafts on its own
+                schedule, so the frame can trail the editor's newest autosave. */}
+            {isCmsEdit && <PreviewLagNotice />}
 
             {/* CMS editor's shareable-link panel */}
             {externalPreviewUrl && (
