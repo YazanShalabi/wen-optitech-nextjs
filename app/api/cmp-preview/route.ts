@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { putDelivery, getLatestDelivery } from '@/lib/cmpPreviewStore'
+import { putDelivery, getLatestDelivery, previewStoreIsDurable } from '@/lib/cmpPreviewStore'
+import { captureSafeHeaders } from '@/lib/captureHeaders'
 import { mapCmpPreviewToBlog } from '@/lib/cmpBlog'
 import { cmpConfigured, acknowledgePreview, completePreview } from '@/lib/cmpApi'
 
@@ -27,6 +28,7 @@ type CapturedMeta = {
   contentType: string
   query: Record<string, string>
   headers: Record<string, string>
+  withheldHeaders: string[]
 }
 
 // Reads the request body without assuming a content type: tries JSON first, then
@@ -105,15 +107,17 @@ export async function POST(req: NextRequest) {
 
   const body = await readBody(req)
 
-  const REDACT = new Set(['callback-secret', 'authorization', 'cookie'])
+  // Allowlisted capture: this meta is republished by the unauthenticated GET
+  // below, and the platform injects credential-bearing headers a denylist would
+  // miss (x-vercel-oidc-token, x-vercel-sc-headers, …). See lib/captureHeaders.
+  const { headers, withheld } = captureSafeHeaders(req.headers)
   const meta: CapturedMeta = {
     receivedAt: new Date().toISOString(),
     method: req.method,
     contentType: req.headers.get('content-type') ?? '',
     query: Object.fromEntries(req.nextUrl.searchParams.entries()),
-    headers: Object.fromEntries(
-      [...req.headers.entries()].filter(([k]) => !REDACT.has(k.toLowerCase())),
-    ),
+    headers,
+    withheldHeaders: withheld,
   }
 
   const previewId = (body as { data?: { preview_id?: string } })?.data?.preview_id
@@ -135,10 +139,29 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const durable = previewStoreIsDurable()
+
+  // Surfaced on every response: without KV the store is per-instance memory, so
+  // a delivery captured by one lambda is invisible to the next one. That makes
+  // the preview work intermittently rather than fail outright — the hardest
+  // kind of bug to spot — so the transport is stated rather than inferred.
+  const store = durable
+    ? { durable: true, backend: 'kv' as const }
+    : {
+        durable: false,
+        backend: 'memory' as const,
+        warning:
+          'No KV backend configured — deliveries are held in per-instance memory and ' +
+          'are lost on redeploy or when a request lands on a different serverless ' +
+          'instance. Set KV_REST_API_URL + KV_REST_API_TOKEN (or the UPSTASH_* ' +
+          'equivalents) for the production CMP preview flow.',
+      }
+
   const latest = await getLatestDelivery()
   if (!latest) {
     return NextResponse.json({
       ok: true,
+      store,
       message:
         'No payload captured yet. Point the CMP preview webhook (POST) at this URL, ' +
         'trigger a preview, then reload this page to inspect the delivery.',
@@ -147,6 +170,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
+    store,
     message: 'Most recently captured CMP webhook delivery.',
     captured: latest.meta,
     payload: latest.payload,
