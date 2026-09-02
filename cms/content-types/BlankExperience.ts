@@ -1,5 +1,18 @@
 import { contentType } from '@optimizely/cms-sdk'
 
+// `PageSeoSettings` and `PageAdminSettings` are legacy component types that live
+// on the shared CMS instance but are deliberately NOT declared in this repo:
+// declaring them would put them in the push manifest, and a manifest push
+// REPLACES a content type's property set — which is the exact data loss this
+// file exists to prevent. The push wants the type's *key* as a string here (the
+// generated manifest and the successful push both confirm this), so the string
+// is the correct wire value; only the SDK's compile-time type wants an imported
+// object. This alias documents that gap instead of scattering casts inline.
+type LegacyContentTypeRef = Parameters<typeof contentType>[0]['properties'] extends
+  Record<string, infer P> ? P extends { contentType: infer C } ? C : never : never
+
+const legacyRef = (key: string) => key as unknown as LegacyContentTypeRef
+
 export const BlankExperience = contentType({
   key: 'BlankExperience',
   displayName: 'Blank Experience',
@@ -18,14 +31,14 @@ export const BlankExperience = contentType({
     // depends on them.
     BlankExperienceSeoSettings: {
       type:        'component',
-      contentType: 'PageSeoSettings',
+      contentType: legacyRef('PageSeoSettings'),
       displayName: 'SEO Settings',
       group:       'SeoSettings',
       sortOrder:   10,
     },
     PageAdminSettings: {
       type:        'component',
-      contentType: 'PageAdminSettings',
+      contentType: legacyRef('PageAdminSettings'),
       displayName: 'Page Admin Settings',
       group:       'AdminSettings',
       sortOrder:   10,
