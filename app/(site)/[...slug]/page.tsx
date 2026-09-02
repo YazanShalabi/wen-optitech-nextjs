@@ -11,7 +11,8 @@ import {
   getSiteSettings,
   setRequestContext,
 } from '@/lib/optimizely'
-import { getBlogPage, getLatestBlogPosts, getAuthorName, fetchAuthorByKey } from '@/lib/blog'
+import { getBlogPage, getLatestBlogPosts, getAuthorName, fetchAuthorByKey, applyDraftOverlay } from '@/lib/blog'
+import { getDraftBlogProperties } from '@/lib/cmsApi'
 import { getCampaignPage, getCampaignPageMeta, mapCampaignPageRaw } from '@/lib/campaign'
 import { getEventPage } from '@/lib/events'
 import { getTopicHubPage } from '@/lib/topicHub'
@@ -293,6 +294,21 @@ async function CmsPage({ params, searchParams }: Props) {
       let blogContent = dm.isEnabled
         ? exp
         : (contentKey ? await getBlogPage(contentKey, locale) : null)
+
+      // ── Draft freshness in the CMS editor ─────────────────────────────────
+      // `exp` comes from Graph, and Graph reindexes a draft only when it is
+      // saved or published — an autosaved edit is therefore absent, so the
+      // editor changes a field and the preview does not move. Overlay the live
+      // draft values read straight from the CMS Management API.
+      //
+      // Gated on `exp` deliberately: Graph is what validates the caller's
+      // preview_token, so reaching this line proves the token was accepted for
+      // this key. getDraftBlogProperties uses the app's own CMS credentials and
+      // performs no token check of its own, so it must never run before that.
+      if (dm.isEnabled && exp && contentKey && blogContent) {
+        const draft = await getDraftBlogProperties(contentKey, sp_str('loc') || locale)
+        blogContent = await applyDraftOverlay(blogContent, draft)
+      }
 
       // In preview/draft mode `exp` comes straight from getPreviewContent, so
       // authorRef is the unresolved ContentReference ({ key }) — BlogPage reads
